@@ -343,6 +343,94 @@ Answer in 2-4 clear sentences. No jargon. Be specific with numbers when relevant
       </svg>
     );
   }
+function HeroCanvas() {
+  useEffect(() => {
+    const canvas = document.getElementById("hero-canvas") as HTMLCanvasElement;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d")!;
+    const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
+    resize();
+    const W = () => canvas.width, H = () => canvas.height;
+    let t = 0, phase = 0, phaseT = 0;
+
+    function drawSphere(a: number) {
+      const cx = W()/2, cy = H()/2;
+      for (let i = 0; i < 14; i++) {
+        const tilt = (i / 14) * Math.PI;
+        const oy = Math.cos(tilt) * 180;
+        const rx = Math.sin(tilt) * 180;
+        if (rx < 3) continue;
+        const op = (0.15 + (rx / 180) * 0.55) * a;
+        ctx.save(); ctx.translate(cx, cy);
+        ctx.strokeStyle = `rgba(196,169,107,${op})`;
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.ellipse(0, oy, rx, rx * 0.28, t * 0.004, 0, Math.PI * 2);
+        ctx.stroke(); ctx.restore();
+      }
+    }
+
+    function drawSpiral(a: number) {
+      const cx = W()/2, cy = H()/2;
+      for (let i = 0; i < 11; i++) {
+        const xo = (i - 5) * 38;
+        const rx = 160 - Math.abs(xo) * 0.5;
+        if (rx < 5) continue;
+        const op = (0.12 + (1 - Math.abs(xo) / 200) * 0.5) * a;
+        ctx.save(); ctx.translate(cx + xo, cy);
+        ctx.strokeStyle = `rgba(196,169,107,${op})`;
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rx * 0.32, rx, t * 0.005 + i * 0.18, 0, Math.PI * 2);
+        ctx.stroke(); ctx.restore();
+      }
+    }
+
+    function drawPolygon(a: number) {
+      const cx = W()/2, cy = H()/2;
+      for (let i = 0; i < 11; i++) {
+        const size = 80 + i * 18;
+        const angle = t * 0.005 + i * 0.3;
+        const op = (0.08 + i * 0.022) * a;
+        ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle);
+        ctx.strokeStyle = `rgba(196,169,107,${op})`;
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        const sides = 5 + (i % 3);
+        for (let j = 0; j <= sides; j++) {
+          const ang = (j / sides) * Math.PI * 2;
+          j === 0 ? ctx.moveTo(Math.cos(ang)*size, Math.sin(ang)*size*0.65)
+                  : ctx.lineTo(Math.cos(ang)*size, Math.sin(ang)*size*0.65);
+        }
+        ctx.closePath(); ctx.stroke(); ctx.restore();
+      }
+    }
+
+    let animId: number;
+    function draw() {
+      ctx.clearRect(0, 0, W(), H());
+      phaseT++;
+      if (phaseT > 240) { phase = (phase + 1) % 3; phaseT = 0; }
+      const a = Math.min(phaseT / 50, 1) * (phaseT > 190 ? 1 - (phaseT - 190) / 50 : 1);
+      if (phase === 0) drawSphere(a);
+      if (phase === 1) drawSpiral(a);
+      if (phase === 2) drawPolygon(a);
+      if (phaseT > 190) {
+        const na = (phaseT - 190) / 50;
+        const np = (phase + 1) % 3;
+        if (np === 0) drawSphere(na);
+        if (np === 1) drawSpiral(na);
+        if (np === 2) drawPolygon(na);
+      }
+      t++;
+      animId = requestAnimationFrame(draw);
+    }
+    draw();
+    window.addEventListener("resize", resize);
+    return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", resize); };
+  }, []);
+  return null;
+}
 
   return (
     <>
@@ -738,30 +826,36 @@ Answer in 2-4 clear sentences. No jargon. Be specific with numbers when relevant
       <div className="page">
 
         {/* HOME */}
-        {section === "home" && (
-          <div className="hero">
-            <div className="hero-glow" />
-            <div className="hero-content">
-              <div className="hero-tag">Yield Vault on Snow Chain</div>
-              <h1 className="hero-h1">Your assets.<br /><span className="ghost">Working.</span></h1>
-              <p className="hero-p">Put your tokens in Fortress, earn yield while you sleep, take them back whenever you want. Built on Snow Chain, powered by Initia.</p>
-              <div className="hero-actions">
-                <button className="btn-primary" onClick={connect}>Open Vault</button>
-                <button className="btn-secondary" onClick={() => setSection("how")}>How it works</button>
-              </div>
-              <div className="built-on">
-                <span className="built-label">Powered by</span>
-                <div className="initia-chip"><div className="i-dot">I</div>Initia Network</div>
-              </div>
-            </div>
-            <div className="metrics">
-              <div className="metric"><div className="metric-n">5%</div><div className="metric-l">Annual yield</div></div>
-              <div className="metric"><div className="metric-n">100ms</div><div className="metric-l">Block time</div></div>
-              <div className="metric"><div className="metric-n">0 days</div><div className="metric-l">Lock-up period</div></div>
-              <div className="metric"><div className="metric-n">SNW</div><div className="metric-l">Native token</div></div>
-            </div>
-          </div>
-        )}
+{section === "home" && (
+  <div className="hero" style={{ display: "grid", gridTemplateRows: "1fr auto" }}>
+    <div className="hero-glow" />
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", alignItems: "center", position: "relative", zIndex: 1 }}>
+      <div className="hero-content" style={{ padding: "80px 64px 60px" }}>
+        <div className="hero-tag">Yield Vault on Snow Chain</div>
+        <h1 className="hero-h1">Your assets.<br /><span className="ghost">Working.</span></h1>
+        <p className="hero-p">Put your tokens in Fortress, earn yield while you sleep, take them back whenever you want. Built on Snow Chain, powered by Initia.</p>
+        <div className="hero-actions">
+          <button className="btn-primary" onClick={connect}>Open Vault</button>
+          <button className="btn-secondary" onClick={() => setSection("how")}>How it works</button>
+        </div>
+        <div className="built-on">
+          <span className="built-label">Powered by</span>
+          <div className="initia-chip"><div className="i-dot">I</div>Initia Network</div>
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 40px 40px 0" }}>
+        <canvas id="hero-canvas" style={{ width: "100%", height: "480px", display: "block" }} />
+      </div>
+    </div>
+    <div className="metrics">
+      <div className="metric"><div className="metric-n">5%</div><div className="metric-l">Annual yield</div></div>
+      <div className="metric"><div className="metric-n">100ms</div><div className="metric-l">Block time</div></div>
+      <div className="metric"><div className="metric-n">0 days</div><div className="metric-l">Lock-up period</div></div>
+      <div className="metric"><div className="metric-n">SNW</div><div className="metric-l">Native token</div></div>
+    </div>
+    <HeroCanvas />
+  </div>
+)}
 
         {/* HOW IT WORKS */}
         {section === "how" && (
@@ -811,7 +905,7 @@ Answer in 2-4 clear sentences. No jargon. Be specific with numbers when relevant
             <div className="pg-head">
               <div className="pg-tag">Bridge</div>
               <div className="pg-title">Bring your tokens to Snow Chain</div>
-              <div className="pg-sub">Initia's native bridge moves tokens from L1 to Snow Chain in under a minute.</div>
+              <div className="pg-sub">The Interwoven Bridge is Initia's native cross-chain protocol. Fortress is built to work with it when deployed on a live network.</div>
             </div>
             <div className="bridge-layout">
               <div>
@@ -828,10 +922,9 @@ Answer in 2-4 clear sentences. No jargon. Be specific with numbers when relevant
                   <div className="sec-label">Steps</div>
                   <div className="bridge-steps">
                     {[
-                      { n: "01", t: <><strong>Get testnet INIT</strong> from the faucet. Required before you can bridge or pay L1 fees.</> },
-                      { n: "02", t: <><strong>Open the bridge</strong> at bridge.testnet.initia.xyz and connect your wallet.</> },
-                      { n: "03", t: <><strong>Select Snow Chain</strong> as destination, enter amount, confirm the transaction.</> },
-                      { n: "04", t: <><strong>Come back here and connect.</strong> Snow Chain added automatically, balance appears in vault.</> },
+                      { n: "01", t: <><strong>Interwoven Bridge</strong> is Initia's native protocol for moving assets between L1 and any appchain like Base, Op, Arb, Snow Chain.</> },
+{ n: "02", t: <><strong>No third party bridges needed.</strong> Assets move directly through the Initia protocol, fast and cheap.</> },
+{ n: "03", t: <><strong>Snow Chain connects natively.</strong> As an EVM rollup on Initia, Snow Chain inherits the full bridge infrastructure automatically.</> },
                     ].map(s => (
                       <div className="bs" key={s.n}>
                         <span className="bs-n mono">{s.n}</span>
@@ -1013,7 +1106,7 @@ Answer in 2-4 clear sentences. No jargon. Be specific with numbers when relevant
                 </div>
                 <div className="info-item">
                   <div className="info-icon">🔗</div>
-                  <div className="info-text"><strong>Need INIT instead?</strong> If you want to bridge from Initia L1, get testnet INIT from the Initia faucet at <a href="https://app.testnet.initia.xyz/faucet" target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>app.testnet.initia.xyz/faucet</a> instead.</div>
+                  <div className="info-text"><strong>Need INIT instead?</strong> If you want to bridge from Initia L1, get testnet token to bridge to any EVM chain. <a href="https://app.testnet.initia.xyz/faucet" target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>app.testnet.initia.xyz/faucet</a> instead.</div>
                 </div>
                 {address && (
                   <button className="btn-primary" style={{ borderRadius: 8 }} onClick={() => setFaucetAddr(address)}>
