@@ -348,48 +348,85 @@ function HeroCanvas() {
     const canvas = document.getElementById("hero-canvas") as HTMLCanvasElement;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
-    const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
+    const resize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    };
     resize();
     let t = 0;
+    let animId: number;
+
+    const rings = [
+      { tiltX: 0,    tiltZ: 0,    speed: 0.006, radius: 160 },
+      { tiltX: 0.5,  tiltZ: 0.3,  speed: 0.005, radius: 155 },
+      { tiltX: 1.0,  tiltZ: 0.6,  speed: 0.007, radius: 148 },
+      { tiltX: 1.5,  tiltZ: 0.9,  speed: 0.004, radius: 140 },
+      { tiltX: 2.0,  tiltZ: 1.2,  speed: 0.008, radius: 130 },
+      { tiltX: 2.5,  tiltZ: 1.5,  speed: 0.005, radius: 118 },
+      { tiltX: 3.0,  tiltZ: 1.8,  speed: 0.006, radius: 105 },
+      { tiltX: -0.5, tiltZ: -0.3, speed: 0.007, radius: 155 },
+      { tiltX: -1.0, tiltZ: -0.6, speed: 0.005, radius: 148 },
+      { tiltX: -1.5, tiltZ: -0.9, speed: 0.006, radius: 138 },
+      { tiltX: -2.0, tiltZ: -1.2, speed: 0.007, radius: 125 },
+      { tiltX: -2.5, tiltZ: -1.5, speed: 0.004, radius: 110 },
+    ];
+
+    function drawRing(
+      cx: number, cy: number,
+      radius: number,
+      tiltX: number, tiltZ: number,
+      angle: number,
+      opacity: number
+    ) {
+      const points: [number, number][] = [];
+      const steps = 80;
+      for (let i = 0; i <= steps; i++) {
+        const a = (i / steps) * Math.PI * 2;
+        let x = Math.cos(a) * radius;
+        let y = Math.sin(a) * radius;
+        let z = 0;
+        // rotate around X axis
+        const y1 = y * Math.cos(tiltX) - z * Math.sin(tiltX);
+        const z1 = y * Math.sin(tiltX) + z * Math.cos(tiltX);
+        // rotate around Z axis
+        const x2 = x * Math.cos(tiltZ) - y1 * Math.sin(tiltZ);
+        const y2 = x * Math.sin(tiltZ) + y1 * Math.cos(tiltZ);
+        // rotate around Y axis (main spin)
+        const x3 = x2 * Math.cos(angle) + z1 * Math.sin(angle);
+        const y3 = y2;
+        const z3 = -x2 * Math.sin(angle) + z1 * Math.cos(angle);
+        // perspective
+        const perspective = 600 / (600 + z3);
+        points.push([cx + x3 * perspective, cy + y3 * perspective]);
+      }
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(196,169,107,${opacity})`;
+      ctx.lineWidth = 0.8;
+      points.forEach(([px, py], i) => i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py));
+      ctx.stroke();
+    }
 
     function draw() {
       const W = canvas.width, H = canvas.height;
       const cx = W / 2, cy = H / 2;
       ctx.clearRect(0, 0, W, H);
 
-      // Rotating sphere — rings spin around Y axis
-      for (let i = 0; i < 14; i++) {
-        const tilt = (i / 14) * Math.PI;
-        const oy = Math.cos(tilt) * 160;
-        const rx = Math.sin(tilt) * 160;
-        if (rx < 3) continue;
-        const op = 0.1 + (rx / 160) * 0.6;
-        const rotAngle = t * 0.008 + i * 0.05;
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.strokeStyle = `rgba(196,169,107,${op})`;
-        ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.ellipse(
-          Math.sin(rotAngle) * 0,
-          oy,
-          rx * Math.abs(Math.cos(t * 0.008)),
-          rx * 0.3,
-          rotAngle,
-          0,
-          Math.PI * 2
-        );
-        ctx.stroke();
-        ctx.restore();
-      }
+      rings.forEach((ring, i) => {
+        const angle = t * ring.speed + i * 0.2;
+        const opacity = 0.25 + (i % 4) * 0.12;
+        drawRing(cx, cy, ring.radius, ring.tiltX, ring.tiltZ, angle, opacity);
+      });
 
       t++;
-      requestAnimationFrame(draw);
+      animId = requestAnimationFrame(draw);
     }
 
-    let animId = requestAnimationFrame(draw);
+    draw();
     window.addEventListener("resize", resize);
-    return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", resize); };
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", resize);
+    };
   }, []);
   return null;
 }
