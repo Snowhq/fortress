@@ -1,7 +1,7 @@
 {
   "project_name": "Fortress",
   "repo_url": "https://github.com/Snowhq/fortress",
-  "commit_sha": "FILL_LATER",
+  "commit_sha": "764470c520de1148a0d7961ef65b080110e83b35",
   "rollup_chain_id": "snow-1",
   "deployed_address": "0xbEB954154E79FF4B124715E9E2568aFDf7340D08",
   "vm": "evm",
