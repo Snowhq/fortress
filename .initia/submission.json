@@ -1,12 +1,12 @@
 {
   "project_name": "Fortress",
-  "repo_url": "https://github.com/YOUR_USERNAME/YOUR_REPO",
-  "commit_sha": "0000000000000000000000000000000000000000",
+  "repo_url": "https://github.com/Snowhq/fortress",
+  "commit_sha": "FILL_LATER",
   "rollup_chain_id": "snow-1",
-  "deployed_address": "0x80fc3f9E5Aa513cB3DAfa721D8236A0e791dc3aF",
+  "deployed_address": "0xbEB954154E79FF4B124715E9E2568aFDf7340D08",
   "vm": "evm",
   "native_feature": "interwoven-bridge",
-  "core_logic_path": "flowvault/src/FlowVault.sol",
-  "native_feature_frontend_path": "flowvault-frontend/app/page.tsx",
-  "demo_video_url": "https://youtu.be/YOUR_VIDEO"
+  "core_logic_path": "flowvault/src/Fortress.sol",
+  "native_feature_frontend_path": "app/page.tsx",
+  "demo_video_url": "https://youtu.be/FILL_LATER"
 }
