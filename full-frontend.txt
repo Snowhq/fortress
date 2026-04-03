@@ -1,0 +1,1040 @@
+import type { Metadata } from "next";
+import "./globals.css";
+import { Providers } from "./providers";
+
+export const metadata: Metadata = {
+  title: "Fortress — Yield Vault on Snow Chain",
+  description: "Deposit SNW, earn yield, withdraw anytime.",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}"use client";
+import { useEffect } from "react";
+import { InterwovenKitProvider, TESTNET, injectStyles } from "@initia/interwovenkit-react";
+import InterwovenKitStyles from "@initia/interwovenkit-react/styles.js";
+import { WagmiProvider, createConfig, http } from "wagmi";
+import { mainnet } from "wagmi/chains";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import "@initia/interwovenkit-react/styles.css";
+
+const queryClient = new QueryClient();
+const wagmiConfig = createConfig({
+  chains: [mainnet],
+  transports: { [mainnet.id]: http() },
+});
+
+const snowChain = {
+  chain_id: "snow-1",
+  chain_name: "snow",
+  pretty_name: "Snow Chain",
+  network_type: "testnet",
+  bech32_prefix: "init",
+  apis: {
+    rpc: [{ address: "http://localhost:26657" }],
+    rest: [{ address: "http://localhost:1317" }],
+    "json-rpc": [{ address: "http://localhost:8545" }],
+  },
+  native_assets: [
+    {
+      denom: "usnw",
+      symbol: "SNW",
+      decimals: 18,
+    },
+  ],
+};
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+  injectStyles(InterwovenKitStyles);
+}, []);
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <InterwovenKitProvider {...TESTNET}>
+          {children}
+        </InterwovenKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  );
+}"use client";
+import { useState, useEffect, useRef, useCallback } from "react";
+
+const CONTRACT = "0x8c9089bC54d3285821AE52cF5873Fe14f9835A8c";
+const CHAIN_ID_HEX = "0x8df38dd443ebb";
+
+type Section = "home" | "how" | "bridge" | "vault" | "tools" | "about";
+type Tool = "advisor" | "simulator" | "leaderboard" | "history";
+
+interface BalanceSnapshot { time: number; balance: number; yield: number; }
+
+const MOCK_LEADERBOARD = [
+  { rank: 1, addr: "0xE12e...f6f4", deposited: "2450.0000", earned: "0.003892", days: 12 },
+  { rank: 2, addr: "0xA3f1...9c2b", deposited: "1800.0000", earned: "0.002847", days: 11 },
+  { rank: 3, addr: "0x7b2d...e441", deposited: "1200.0000", earned: "0.001523", days: 9 },
+  { rank: 4, addr: "0xC90a...1f33", deposited: "980.0000", earned: "0.001102", days: 8 },
+  { rank: 5, addr: "0x4e8c...a712", deposited: "750.0000", earned: "0.000751", days: 7 },
+];
+
+export default function Fortress() {
+  const { initiaAddress, openConnect, requestTxBlock } = useInterwovenKit();
+  const [section, setSection] = useState<Section>("home");
+  const [address, setAddress] = useState("");
+  const [balance, setBalance] = useState("0.0000");
+  const [yieldEarned, setYieldEarned] = useState("0.000000");
+  const [amount, setAmount] = useState("");
+  const [status, setStatus] = useState<{ type: "ok" | "err" | "info"; msg: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [activeTool, setActiveTool] = useState<Tool>("advisor");
+  const [aiInput, setAiInput] = useState("");
+  const [aiResponse, setAiResponse] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [simAmount, setSimAmount] = useState("1000");
+  const [simDays, setSimDays] = useState(365);
+  const [history, setHistory] = useState<BalanceSnapshot[]>([]);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!address) return;
+    intervalRef.current = setInterval(() => refresh(address), 3000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [address]);
+
+  const saveSnapshot = useCallback((bal: number, yld: number) => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("fortress_history") || "[]");
+      const snap: BalanceSnapshot = { time: Date.now(), balance: bal, yield: yld };
+      const updated = [...stored.slice(-49), snap];
+      localStorage.setItem("fortress_history", JSON.stringify(updated));
+      setHistory(updated);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("fortress_history") || "[]");
+      setHistory(stored);
+    } catch {}
+  }, []);
+
+  async function refresh(addr: string) {
+    try {
+      const { ethers } = await import("ethers");
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const abi = [
+        "function balances(address) view returns (uint256)",
+        "function calculateYield(address) view returns (uint256)",
+      ];
+      const c = new ethers.Contract(CONTRACT, abi, provider);
+      const [bal, yld] = await Promise.all([c.balances(addr), c.calculateYield(addr)]);
+      const balNum = parseFloat(ethers.formatEther(bal));
+      const yldNum = parseFloat(ethers.formatEther(yld));
+      setBalance(balNum.toFixed(4));
+      setYieldEarned(yldNum.toFixed(6));
+      if (balNum > 0) saveSnapshot(balNum, yldNum);
+    } catch {}
+  }
+
+  async function connect() {
+  openConnect();
+  setSection("vault");
+}
+  async function deposit() {
+    if (!amount) return;
+    setLoading(true);
+    setStatus({ type: "info", msg: "Sending your deposit to Snow Chain..." });
+    try {
+      const { ethers } = await import("ethers");
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      const c = new ethers.Contract(CONTRACT, ["function deposit() payable"], signer);
+      const tx = await c.deposit({ value: ethers.parseEther(amount) });
+      setStatus({ type: "info", msg: "Almost there, waiting for confirmation..." });
+      await tx.wait();
+      await refresh(address);
+      setStatus({ type: "ok", msg: `${amount} SNW is in the vault. Yield starts now.` });
+      setAmount("");
+    } catch (e: any) { setStatus({ type: "err", msg: e.message?.slice(0, 120) ?? "Something went wrong." }); }
+    setLoading(false);
+  }
+
+  async function withdraw() {
+    setLoading(true);
+    setStatus({ type: "info", msg: "Preparing your withdrawal..." });
+    try {
+      const { ethers } = await import("ethers");
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      const c = new ethers.Contract(CONTRACT, ["function withdraw()"], signer);
+      const tx = await c.withdraw();
+      setStatus({ type: "info", msg: "Almost there, waiting for confirmation..." });
+      await tx.wait();
+      await refresh(address);
+      setStatus({ type: "ok", msg: "All done. Your deposit and yield are back in your wallet." });
+    } catch (e: any) { setStatus({ type: "err", msg: e.message?.slice(0, 120) ?? "Something went wrong." }); }
+    setLoading(false);
+  }
+
+ async function askAI() {
+  if (!aiInput.trim() || !apiKey.trim()) return;
+
+  setAiLoading(true);
+  setAiResponse("");
+
+  try {
+    const prompt = `You are a DeFi yield advisor for Fortress, a yield vault on Snow Chain (an EVM appchain on Initia). 
+The user has: ${balance} SNW deposited, ${yieldEarned} SNW yield earned so far. The vault earns 5% APY, calculated per second, paid on withdrawal. No lock-up period.
+Answer this question clearly and helpfully in 2-3 sentences max. No jargon. Be direct: ${aiInput}`;
+
+    const res = await fetch("/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, apiKey }),
+    });
+
+    const data = await res.json();
+    setAiResponse(data.content?.[0]?.text ?? "Something went wrong.");
+
+  } catch (err) {
+    setAiResponse("Could not reach the AI. Check your API key and try again.");
+  }
+
+  setAiLoading(false);
+}
+
+  const simYield = (amt: number, days: number) => (amt * 0.05 * days) / 365;
+  const simTotal = (amt: number, days: number) => amt + simYield(amt, days);
+
+  const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "";
+
+  const navItems: { id: Section; label: string }[] = [
+    { id: "home", label: "Home" },
+    { id: "how", label: "How it works" },
+    { id: "bridge", label: "Bridge" },
+    { id: "vault", label: "Vault" },
+    { id: "tools", label: "Tools" },
+    { id: "about", label: "About" },
+  ];
+
+  const toolItems: { id: Tool; label: string }[] = [
+    { id: "advisor", label: "AI Advisor" },
+    { id: "simulator", label: "Yield Simulator" },
+    { id: "leaderboard", label: "Leaderboard" },
+    { id: "history", label: "Portfolio History" },
+  ];
+
+  // SVG Chart helpers
+  function SimChart() {
+    const amt = parseFloat(simAmount) || 0;
+    const points = [7, 30, 90, 180, 365, 730].map(d => ({ d, y: simYield(amt, d), t: simTotal(amt, d) }));
+    const maxVal = points[points.length - 1].t;
+    const w = 560; const h = 200; const pad = 48;
+    const x = (i: number) => pad + (i / (points.length - 1)) * (w - pad * 2);
+    const y = (v: number) => h - pad - ((v - amt) / (maxVal - amt + 0.001)) * (h - pad * 2);
+    const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(p.t)}`).join(" ");
+    return (
+      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", background: "var(--bg2)", borderRadius: 2 }}>
+        <line x1={pad} y1={pad} x2={pad} y2={h - pad} stroke="var(--border2)" strokeWidth="1" />
+        <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="var(--border2)" strokeWidth="1" />
+        {[0, 0.25, 0.5, 0.75, 1].map((t, i) => {
+          const val = amt + t * (maxVal - amt);
+          const yy = h - pad - t * (h - pad * 2);
+          return <g key={i}><line x1={pad} y1={yy} x2={w - pad} y2={yy} stroke="var(--border)" strokeWidth="0.5" strokeDasharray="3,3" /><text x={pad - 6} y={yy + 4} fill="var(--gray)" fontSize="9" textAnchor="end" fontFamily="IBM Plex Mono">{val.toFixed(0)}</text></g>;
+        })}
+        <path d={pathD} fill="none" stroke="var(--gold)" strokeWidth="1.5" />
+        {points.map((p, i) => (
+          <g key={i}>
+            <circle cx={x(i)} cy={y(p.t)} r="3" fill="var(--gold)" />
+            <text x={x(i)} y={h - pad + 14} fill="var(--gray)" fontSize="9" textAnchor="middle" fontFamily="IBM Plex Mono">{p.d}d</text>
+          </g>
+        ))}
+      </svg>
+    );
+  }
+
+  function HistoryChart() {
+    if (history.length < 2) return (
+      <div style={{ padding: "64px 20px", textAlign: "center", color: "var(--gray)", fontSize: 13 }}>
+        Your portfolio history will appear here once you start depositing. Make a deposit to begin tracking.
+      </div>
+    );
+    const w = 560; const h = 200; const pad = 48;
+    const balances = history.map(h => h.balance);
+    const minB = Math.min(...balances);
+    const maxB = Math.max(...balances) || 1;
+    const x = (i: number) => pad + (i / (history.length - 1)) * (w - pad * 2);
+    const y = (v: number) => h - pad - ((v - minB) / (maxB - minB + 0.001)) * (h - pad * 2);
+    const pathD = history.map((s, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(s.balance)}`).join(" ");
+    const areaD = `${pathD} L ${x(history.length - 1)} ${h - pad} L ${x(0)} ${h - pad} Z`;
+    return (
+      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", background: "var(--bg2)", borderRadius: 2 }}>
+        <defs>
+          <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--green)" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="var(--green)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <line x1={pad} y1={pad} x2={pad} y2={h - pad} stroke="var(--border2)" strokeWidth="1" />
+        <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="var(--border2)" strokeWidth="1" />
+        <path d={areaD} fill="url(#ag)" />
+        <path d={pathD} fill="none" stroke="var(--green)" strokeWidth="1.5" />
+        <circle cx={x(history.length - 1)} cy={y(history[history.length - 1].balance)} r="3" fill="var(--green)" />
+        <text x={pad - 6} y={y(maxB) + 4} fill="var(--gray)" fontSize="9" textAnchor="end" fontFamily="IBM Plex Mono">{maxB.toFixed(2)}</text>
+        <text x={pad - 6} y={h - pad + 4} fill="var(--gray)" fontSize="9" textAnchor="end" fontFamily="IBM Plex Mono">{minB.toFixed(2)}</text>
+      </svg>
+    );
+  }
+
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+        :root{
+          --bg:#070707;--bg2:#0d0d0d;--bg3:#141414;--bg4:#1c1c1c;
+          --white:#f0ede8;--white2:#a8a8a2;--gray:#4a4a4a;--gray2:#2e2e2e;
+          --border:rgba(240,237,232,0.06);--border2:rgba(240,237,232,0.12);--border3:rgba(240,237,232,0.22);
+          --gold:#c4a96b;--gold2:rgba(196,169,107,0.08);
+          --green:#4ade80;--green2:rgba(74,222,128,0.07);
+          --red:#f87171;--red2:rgba(248,113,113,0.07);
+        }
+        html,body{background:var(--bg);color:var(--white);font-family:'Space Grotesk',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
+        .mono{font-family:'IBM Plex Mono',monospace;}
+        a{color:inherit;text-decoration:none;}
+        button{font-family:'Space Grotesk',sans-serif;}
+        textarea{font-family:'Space Grotesk',sans-serif;}
+
+        nav{position:fixed;top:0;left:0;right:0;z-index:300;height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 36px;background:rgba(7,7,7,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);}
+        .nav-left{display:flex;align-items:center;gap:32px;}
+        .nav-logo{display:flex;align-items:center;gap:10px;cursor:pointer;}
+        .logo-mark{width:28px;height:28px;border:1px solid rgba(240,237,232,0.35);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;color:var(--white);transition:border-color .2s;}
+        .nav-logo:hover .logo-mark{border-color:var(--gold);}
+        .logo-wordmark{font-size:14px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;}
+        .nav-links{display:flex;align-items:center;gap:0;}
+        .nav-link{padding:6px 13px;font-size:13px;font-weight:500;color:var(--white2);cursor:pointer;border:none;background:transparent;transition:color .15s;letter-spacing:0.01em;}
+        .nav-link:hover{color:var(--white);}
+        .nav-link.active{color:var(--white);}
+        .nav-right{display:flex;align-items:center;gap:10px;}
+        .chain-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.08em;color:var(--white2);border:1px solid var(--border2);padding:5px 10px;display:flex;align-items:center;gap:6px;}
+        .live-dot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 2s infinite;}
+        @keyframes blink{0%,100%{opacity:1;}50%{opacity:0.25;}}
+        .addr-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gold);border:1px solid rgba(196,169,107,0.2);padding:5px 10px;background:var(--gold2);}
+        .btn-connect{background:var(--white);color:var(--bg);border:none;padding:8px 20px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:background .15s;}
+        .btn-connect:hover{background:var(--gold);}
+
+        .page{padding-top:58px;}
+
+        /* HOME */
+        .hero{min-height:calc(100vh - 58px);display:grid;grid-template-rows:1fr auto;position:relative;overflow:hidden;}
+        .hero-glow{position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse 50% 60% at 70% 40%,rgba(196,169,107,0.03) 0%,transparent 60%),radial-gradient(ellipse 40% 40% at 20% 70%,rgba(74,222,128,0.02) 0%,transparent 60%);pointer-events:none;}
+        .hero-content{display:flex;flex-direction:column;justify-content:center;padding:80px 64px 60px;position:relative;z-index:1;}
+        .hero-label{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);margin-bottom:32px;display:flex;align-items:center;gap:14px;}
+        .hero-label::before{content:'';width:32px;height:1px;background:var(--gold);opacity:0.5;}
+        .hero-h1{font-size:clamp(64px,9vw,120px);font-weight:700;line-height:0.9;letter-spacing:-0.04em;margin-bottom:36px;}
+        .hero-h1 .stroke{-webkit-text-stroke:1px rgba(240,237,232,0.6);color:transparent;}
+        .hero-p{font-size:17px;line-height:1.8;color:var(--white2);max-width:500px;margin-bottom:48px;}
+        .hero-btns{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+        .btn-cta{background:var(--white);color:var(--bg);border:none;padding:15px 36px;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:background .15s;}
+        .btn-cta:hover{background:var(--gold);}
+        .btn-outline{background:transparent;color:var(--white);border:1px solid var(--border3);padding:15px 36px;font-size:13px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;transition:border-color .15s;}
+        .btn-outline:hover{border-color:rgba(240,237,232,0.4);}
+        .built-on{margin-top:52px;display:flex;align-items:center;gap:16px;}
+        .built-on-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--gray);}
+        .initia-pill{display:flex;align-items:center;gap:8px;border:1px solid var(--border2);padding:7px 14px;font-size:12px;font-weight:600;letter-spacing:0.05em;}
+        .i-circle{width:18px;height:18px;background:var(--white);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;color:var(--bg);}
+        .hero-stats{border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);position:relative;z-index:1;}
+        .stat{padding:32px 40px;border-right:1px solid var(--border);}
+        .stat:last-child{border-right:none;}
+        .stat-n{font-size:36px;font-weight:700;letter-spacing:-0.02em;margin-bottom:4px;}
+        .stat-l{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--gray);}
+
+        /* SHARED */
+        .wrap{max-width:1120px;margin:0 auto;padding:80px 40px;}
+        .page-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:64px;padding-bottom:40px;border-bottom:1px solid var(--border);gap:48px;}
+        .page-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:14px;}
+        .page-h{font-size:clamp(34px,4vw,54px);font-weight:700;letter-spacing:-0.025em;line-height:1.05;}
+        .page-sub{font-size:15px;line-height:1.8;color:var(--white2);max-width:380px;flex-shrink:0;padding-top:8px;}
+
+        /* HOW */
+        .steps-list{background:var(--border);display:flex;flex-direction:column;gap:1px;}
+        .step-row{background:var(--bg);display:grid;grid-template-columns:72px 1fr 1.2fr;align-items:start;padding:36px 0;transition:background .15s;}
+        .step-row:hover{background:var(--bg2);}
+        .s-num{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.15em;color:var(--gold);padding:4px 32px;}
+        .s-title{font-size:18px;font-weight:600;letter-spacing:-0.01em;padding-right:48px;border-right:1px solid var(--border);line-height:1.4;}
+        .s-body{font-size:14px;line-height:1.85;color:var(--white2);padding:0 40px;}
+        .s-body strong{color:var(--white);font-weight:600;}
+        .faq-section{margin-top:72px;}
+        .faq-title{font-size:26px;font-weight:700;letter-spacing:-0.02em;margin-bottom:32px;}
+        .faq-item{border-top:1px solid var(--border);padding:24px 0;}
+        .faq-q{font-size:15px;font-weight:600;margin-bottom:10px;}
+        .faq-a{font-size:14px;line-height:1.8;color:var(--white2);max-width:680px;}
+
+        /* BRIDGE */
+        .bridge-grid{display:grid;grid-template-columns:1fr 360px;gap:40px;align-items:start;}
+        .card{border:1px solid var(--border);padding:32px;}
+        .card-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--gray);margin-bottom:24px;}
+        .route-vis{display:flex;align-items:center;margin:28px 0;}
+        .route-node{flex:1;border:1px solid var(--border2);padding:18px;text-align:center;}
+        .route-node-name{font-size:14px;font-weight:600;margin-bottom:4px;}
+        .route-node-sub{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gray);letter-spacing:0.06em;}
+        .route-arrow{padding:0 14px;color:var(--gold);font-size:18px;flex-shrink:0;}
+        .step-items{display:flex;flex-direction:column;gap:1px;background:var(--border);}
+        .step-item{background:var(--bg);display:flex;align-items:flex-start;gap:16px;padding:18px 20px;}
+        .step-item-n{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gold);flex-shrink:0;margin-top:2px;}
+        .step-item-t{font-size:14px;line-height:1.7;color:var(--white2);}
+        .step-item-t strong{color:var(--white);}
+        .side-card{border:1px solid var(--border);padding:28px;position:sticky;top:76px;}
+        .notice{background:var(--gold2);border:1px solid rgba(196,169,107,0.15);padding:14px 18px;font-size:13px;line-height:1.65;color:var(--white2);margin-bottom:20px;}
+        .notice strong{color:var(--gold);}
+        .quick-link{display:block;padding:14px 0;border-bottom:1px solid var(--border);}
+        .quick-link:last-of-type{border-bottom:none;}
+        .quick-link-name{font-size:13px;font-weight:600;color:var(--white);margin-bottom:3px;}
+        .quick-link-desc{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gray);}
+        .btn-full{width:100%;background:var(--white);color:var(--bg);border:none;padding:14px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:background .15s;margin-top:24px;}
+        .btn-full:hover{background:var(--gold);}
+
+        /* VAULT */
+        .vault-wrap{display:grid;grid-template-columns:1fr 360px;min-height:calc(100vh - 58px);border-top:1px solid var(--border);}
+        .vault-left{padding:52px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:48px;}
+        .vault-right{padding:40px;display:flex;flex-direction:column;gap:24px;background:var(--bg2);}
+        .section-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--gray);margin-bottom:20px;}
+        .balance-block{border:1px solid var(--border);}
+        .balance-top{padding:36px;border-bottom:1px solid var(--border);}
+        .balance-live{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--gray);display:flex;align-items:center;gap:8px;margin-bottom:20px;}
+        .balance-num{font-size:56px;font-weight:700;letter-spacing:-0.04em;line-height:1;}
+        .balance-num small{font-size:20px;font-weight:400;color:var(--white2);margin-left:6px;letter-spacing:0;}
+        .balance-row{display:grid;grid-template-columns:repeat(3,1fr);}
+        .b-stat{padding:20px 24px;border-right:1px solid var(--border);}
+        .b-stat:last-child{border-right:none;}
+        .b-stat-l{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray);margin-bottom:6px;}
+        .b-stat-v{font-size:16px;font-weight:600;}
+        .b-stat-v.g{color:var(--green);}
+        .tx-table{border:1px solid var(--border);}
+        .tx-head{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;background:var(--bg2);border-bottom:1px solid var(--border);padding:11px 20px;}
+        .tx-th{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--gray);}
+        .tx-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;padding:15px 20px;border-bottom:1px solid var(--border);align-items:center;}
+        .tx-row:last-child{border-bottom:none;}
+        .tx-td{font-size:13px;color:var(--white2);}
+        .tx-td.mono{font-family:'IBM Plex Mono',monospace;font-size:11px;}
+        .tx-td.g{color:var(--green);}
+        .tx-td.gold{color:var(--gold);}
+        .empty{padding:56px 20px;text-align:center;color:var(--gray);font-size:13px;line-height:1.7;}
+        .form-block{border:1px solid var(--border);padding:28px;background:var(--bg);}
+        .f-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:8px;}
+        .f-input{width:100%;background:var(--bg2);border:1px solid var(--border2);padding:13px 16px;color:var(--white);font-family:'IBM Plex Mono',monospace;font-size:16px;outline:none;margin-bottom:14px;transition:border-color .15s;}
+        .f-input:focus{border-color:var(--border3);}
+        .f-input::placeholder{color:var(--gray2);}
+        .btn-dep{width:100%;background:var(--white);color:var(--bg);border:none;padding:14px;margin-bottom:8px;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:background .15s;}
+        .btn-dep:hover:not(:disabled){background:var(--gold);}
+        .btn-dep:disabled{opacity:0.3;cursor:not-allowed;}
+        .btn-wth{width:100%;background:transparent;color:var(--white);border:1px solid var(--border2);padding:14px;font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:all .15s;}
+        .btn-wth:hover:not(:disabled){border-color:var(--border3);background:var(--bg3);}
+        .btn-wth:disabled{opacity:0.3;cursor:not-allowed;}
+        .status-line{margin-top:12px;padding:12px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;}
+        .status-line.ok{background:var(--green2);border:1px solid rgba(74,222,128,0.18);color:var(--green);}
+        .status-line.err{background:var(--red2);border:1px solid rgba(248,113,113,0.18);color:var(--red);}
+        .status-line.info{background:var(--gold2);border:1px solid rgba(196,169,107,0.18);color:var(--gold);}
+        .info-block{border:1px solid var(--border);}
+        .info-row{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-bottom:1px solid var(--border);}
+        .info-row:last-child{border-bottom:none;}
+        .info-k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray);}
+        .info-v{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--white2);}
+        .connect-gate{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 120px);gap:18px;text-align:center;padding:40px;}
+        .gate-icon{width:52px;height:52px;border:1px solid var(--border3);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:18px;margin-bottom:8px;}
+        .connect-gate h2{font-size:22px;font-weight:700;letter-spacing:-0.02em;}
+        .connect-gate p{font-size:14px;color:var(--white2);max-width:340px;line-height:1.75;margin-bottom:8px;}
+
+        /* TOOLS */
+        .tools-layout{display:grid;grid-template-columns:200px 1fr;min-height:calc(100vh - 58px);border-top:1px solid var(--border);}
+        .tools-nav{border-right:1px solid var(--border);padding:32px 0;background:var(--bg2);}
+        .tool-nav-item{display:block;width:100%;padding:12px 24px;font-size:13px;font-weight:500;color:var(--white2);cursor:pointer;border:none;background:transparent;text-align:left;transition:all .15s;border-left:2px solid transparent;}
+        .tool-nav-item:hover{color:var(--white);background:var(--bg3);}
+        .tool-nav-item.active{color:var(--gold);border-left-color:var(--gold);background:var(--bg3);}
+        .tool-nav-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--gray);padding:16px 24px 8px;display:block;}
+        .tools-content{padding:52px;}
+
+        /* AI ADVISOR */
+        .ai-wrap{max-width:680px;}
+        .ai-desc{font-size:14px;line-height:1.8;color:var(--white2);margin-bottom:32px;}
+        .ai-key-wrap{margin-bottom:20px;}
+        .ai-textarea{width:100%;background:var(--bg2);border:1px solid var(--border2);padding:14px 16px;color:var(--white);font-size:14px;line-height:1.6;outline:none;resize:vertical;min-height:80px;margin-bottom:12px;transition:border-color .15s;}
+        .ai-textarea:focus{border-color:var(--border3);}
+        .ai-textarea::placeholder{color:var(--gray2);}
+        .btn-ask{background:var(--white);color:var(--bg);border:none;padding:12px 28px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:background .15s;}
+        .btn-ask:hover:not(:disabled){background:var(--gold);}
+        .btn-ask:disabled{opacity:0.3;cursor:not-allowed;}
+        .ai-response{margin-top:24px;padding:24px;border:1px solid var(--border2);background:var(--bg2);font-size:15px;line-height:1.8;color:var(--white);}
+        .ai-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;}
+        .ai-quick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;}
+        .ai-quick-btn{background:transparent;border:1px solid var(--border2);color:var(--white2);padding:7px 14px;font-size:12px;cursor:pointer;transition:all .15s;}
+        .ai-quick-btn:hover{border-color:var(--border3);color:var(--white);}
+
+        /* SIMULATOR */
+        .sim-controls{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:32px;}
+        .sim-group{}
+        .sim-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:8px;}
+        .sim-input{width:100%;background:var(--bg2);border:1px solid var(--border2);padding:12px 16px;color:var(--white);font-family:'IBM Plex Mono',monospace;font-size:16px;outline:none;transition:border-color .15s;}
+        .sim-input:focus{border-color:var(--border3);}
+        .sim-range{width:100%;margin-top:8px;accent-color:var(--gold);}
+        .sim-results{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin-bottom:32px;}
+        .sim-result{background:var(--bg2);padding:24px;}
+        .sim-result-l{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray);margin-bottom:8px;}
+        .sim-result-v{font-size:24px;font-weight:700;letter-spacing:-0.02em;}
+        .sim-result-v.gold{color:var(--gold);}
+        .sim-result-v.green{color:var(--green);}
+
+        /* LEADERBOARD */
+        .lb-table{border:1px solid var(--border);}
+        .lb-head{display:grid;grid-template-columns:48px 1fr 1fr 1fr 80px;background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 20px;gap:16px;}
+        .lb-th{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--gray);}
+        .lb-row{display:grid;grid-template-columns:48px 1fr 1fr 1fr 80px;padding:16px 20px;border-bottom:1px solid var(--border);align-items:center;gap:16px;transition:background .15s;}
+        .lb-row:last-child{border-bottom:none;}
+        .lb-row:hover{background:var(--bg2);}
+        .lb-rank{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;}
+        .lb-rank.gold{color:var(--gold);}
+        .lb-rank.silver{color:#999;}
+        .lb-rank.bronze{color:#cd7f32;}
+        .lb-td{font-size:13px;color:var(--white2);}
+        .lb-td.mono{font-family:'IBM Plex Mono',monospace;font-size:11px;}
+        .lb-td.green{color:var(--green);}
+        .lb-notice{padding:16px 20px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gray);border-top:1px solid var(--border);letter-spacing:0.06em;}
+
+        /* HISTORY */
+        .hist-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin-bottom:24px;}
+        .hist-stat{background:var(--bg2);padding:20px 24px;}
+        .hist-stat-l{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray);margin-bottom:6px;}
+        .hist-stat-v{font-size:18px;font-weight:600;}
+        .hist-stat-v.g{color:var(--green);}
+
+        /* ABOUT */
+        .about-cells{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);}
+        .a-cell{background:var(--bg);padding:52px 44px;}
+        .a-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);margin-bottom:18px;}
+        .a-h{font-size:22px;font-weight:600;letter-spacing:-0.02em;margin-bottom:16px;line-height:1.3;}
+        .a-p{font-size:14px;line-height:1.85;color:var(--white2);}
+        .a-p strong{color:var(--white);}
+        .tech-cells{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin-top:1px;}
+        .t-cell{background:var(--bg);padding:24px 28px;}
+        .t-name{font-size:14px;font-weight:600;margin-bottom:4px;}
+        .t-desc{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gray);letter-spacing:0.04em;}
+
+        footer{border-top:1px solid var(--border);padding:24px 40px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;}
+        .foot-left{display:flex;align-items:center;gap:24px;}
+        .foot-copy{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gray);}
+        .foot-link{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gray);cursor:pointer;border:none;background:none;transition:color .15s;text-decoration:none;}
+        .foot-link:hover{color:var(--white);}
+        .foot-right{display:flex;align-items:center;gap:8px;}
+        .foot-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray);border:1px solid var(--border);padding:4px 10px;}
+
+        @media(max-width:900px){
+          .hero-content{padding:60px 24px 48px;}
+          .hero-stats{grid-template-columns:1fr 1fr;position:static;}
+          .stat{border-bottom:1px solid var(--border);}
+          .bridge-grid,.vault-wrap,.about-cells,.tech-cells{grid-template-columns:1fr;}
+          .vault-left{border-right:none;border-bottom:1px solid var(--border);}
+          .page-head{flex-direction:column;}
+          .step-row{grid-template-columns:56px 1fr;}
+          .s-title{border-right:none;padding-right:0;padding-bottom:10px;}
+          .s-body{padding:10px 0 0;}
+          .balance-row{grid-template-columns:1fr 1fr;}
+          .wrap{padding:48px 20px;}
+          nav{padding:0 16px;}
+          .nav-links{display:none;}
+          footer{padding:20px;}
+          .tools-layout{grid-template-columns:1fr;}
+          .tools-nav{border-right:none;border-bottom:1px solid var(--border);padding:16px 0;}
+          .sim-controls{grid-template-columns:1fr;}
+          .sim-results{grid-template-columns:1fr 1fr;}
+          .lb-head,.lb-row{grid-template-columns:40px 1fr 1fr 1fr;}
+          .hist-stats{grid-template-columns:1fr 1fr;}
+        }
+      `}</style>
+
+      {/* NAV */}
+      <nav>
+        <div className="nav-left">
+          <div className="nav-logo" onClick={() => setSection("home")}>
+            <div className="logo-mark">F</div>
+            <span className="logo-wordmark">Fortress</span>
+          </div>
+          <div className="nav-links">
+            {navItems.map(n => (
+              <button key={n.id} className={`nav-link${section === n.id ? " active" : ""}`}
+                onClick={() => { if (n.id === "vault" && !address) connect(); else setSection(n.id); }}>
+                {n.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="nav-right">
+          <div className="chain-tag mono"><span className="live-dot" />Snow Chain</div>
+          {address ? <div className="addr-tag mono">{shortAddr}</div> : <button className="btn-connect" onClick={connect}>Connect</button>}
+        </div>
+      </nav>
+
+      <div className="page">
+
+        {/* HOME */}
+        {section === "home" && (
+          <div className="hero">
+            <div className="hero-glow" />
+            <div className="hero-content">
+              <div className="hero-label">Yield Vault on Snow Chain</div>
+              <h1 className="hero-h1">Your assets.<br /><span className="stroke">Working.</span></h1>
+              <p className="hero-p">Put your tokens in Fortress, earn yield while you sleep, take them back whenever you want. Built on Snow Chain, powered by Initia.</p>
+              <div className="hero-btns">
+                <button className="btn-cta" onClick={connect}>Open Vault</button>
+                <button className="btn-outline" onClick={() => setSection("how")}>See how it works</button>
+              </div>
+              <div className="built-on">
+                <span className="built-on-label">Powered by</span>
+                <div className="initia-pill"><div className="i-circle">I</div>Initia Network</div>
+              </div>
+            </div>
+            <div className="hero-stats">
+              <div className="stat"><div className="stat-n">5%</div><div className="stat-l">Annual yield</div></div>
+              <div className="stat"><div className="stat-n">100ms</div><div className="stat-l">Block time</div></div>
+              <div className="stat"><div className="stat-n">0 days</div><div className="stat-l">Lock-up period</div></div>
+              <div className="stat"><div className="stat-n">SNW</div><div className="stat-l">Native token</div></div>
+            </div>
+          </div>
+        )}
+
+        {/* HOW IT WORKS */}
+        {section === "how" && (
+          <div className="wrap">
+            <div className="page-head">
+              <div><div className="page-tag">How it works</div><h2 className="page-h">Simple from start to finish</h2></div>
+              <p className="page-sub">Fortress was built for people who want to earn yield without sitting through a tutorial.</p>
+            </div>
+            <div className="steps-list">
+              {[
+                { n: "01", title: "Connect your wallet", body: <>Click Connect and Snow Chain is added to MetaMask automatically. Your existing wallet address works here. Nothing new to create.</> },
+                { n: "02", title: "Get SNW onto Snow Chain", body: <>If your tokens are on Initia L1, move them over using the Bridge tab. Initia has a native bridge built into the protocol — fast and cheap. Check the Bridge page for the full walkthrough.</> },
+                { n: "03", title: "Deposit into the vault", body: <>Type how much you want to deposit and confirm the transaction. Your tokens go into the Fortress smart contract. Only your wallet can ever take them back out.</>},
+                { n: "04", title: "Yield builds every second", body: <><strong>5% APY starts accruing automatically</strong> from the moment your deposit confirms. Watch it grow in real time on the Vault page. The longer your tokens stay in, the more you earn.</> },
+                { n: "05", title: "Withdraw whenever you want", body: <>Hit Withdraw and the vault sends back your original amount plus everything you have earned, in one transaction. No waiting period, no penalty for leaving early.</> },
+              ].map(s => (
+                <div className="step-row" key={s.n}>
+                  <div className="s-num mono">{s.n}</div>
+                  <div className="s-title">{s.title}</div>
+                  <div className="s-body">{s.body}</div>
+                </div>
+              ))}
+            </div>
+            <div className="faq-section">
+              <div className="page-tag">Questions</div>
+              <div className="faq-title">Things people ask</div>
+              {[
+                { q: "Is my money actually safe here?", a: "The Fortress smart contract holds your tokens, not a company or a team. The contract code is public and verifiable on Snow Chain. Only your wallet address can withdraw your funds." },
+                { q: "Where does the yield come from?", a: "In the current version, yield is paid from the vault's reserve at a fixed rate of 5% per year, calculated to the second. Future versions will route deposits into live DeFi strategies to generate yield from real market activity." },
+                { q: "What is Snow Chain?", a: "Snow Chain is an EVM-compatible blockchain built on Initia. It produces blocks every 100 milliseconds, connects to Initia L1 through the Interwoven Bridge, and uses SNW as its native token. Fortress is the first DeFi app deployed on it." },
+                { q: "Do I need to bridge before depositing?", a: "Only if you are starting from Initia L1. If you already have SNW tokens on Snow Chain, you can deposit directly without going through the bridge." },
+                { q: "Are there any fees?", a: "Fortress takes no protocol fee. You only pay the standard network cost on Snow Chain, which is very low." },
+              ].map(f => (
+                <div className="faq-item" key={f.q}>
+                  <div className="faq-q">{f.q}</div>
+                  <div className="faq-a">{f.a}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* BRIDGE */}
+        {section === "bridge" && (
+          <div className="wrap">
+            <div className="page-head">
+              <div><div className="page-tag">Bridge</div><h2 className="page-h">Bring your tokens<br />to Snow Chain</h2></div>
+              <p className="page-sub">Initia has a native bridge built into the protocol. Moving tokens from L1 to Snow Chain takes about a minute and costs almost nothing.</p>
+            </div>
+            <div className="bridge-grid">
+              <div>
+                <div className="card" style={{ marginBottom: 24 }}>
+                  <div className="card-label mono">Transfer path</div>
+                  <div className="route-vis">
+                    <div className="route-node"><div className="route-node-name">Initia L1</div><div className="route-node-sub mono">initiation-2</div></div>
+                    <div className="route-arrow">→</div>
+                    <div className="route-node"><div className="route-node-name">Snow Chain</div><div className="route-node-sub mono">EVM appchain</div></div>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--white2)", lineHeight: 1.8 }}>Tokens move from Initia L1 to Snow Chain through the Interwoven Bridge. Once your transfer is confirmed on L1, the tokens appear on Snow Chain within seconds.</p>
+                </div>
+                <div className="card">
+                  <div className="card-label mono">How to bridge</div>
+                  <div className="step-items">
+                    {[
+                      { n: "01", t: <><strong>Visit the Initia faucet</strong> at app.testnet.initia.xyz/faucet. Paste your wallet address and request testnet INIT tokens.</> },
+                      { n: "02", t: <><strong>Open the Initia Bridge</strong> at app.testnet.initia.xyz/bridge. Connect your MetaMask wallet to Initia L1 when prompted.</> },
+                      { n: "03", t: <><strong>Select Snow Chain</strong> as your destination and enter the amount you want to send.</> },
+                      { n: "04", t: <><strong>Confirm the transaction</strong> in your wallet. The transfer processes and your tokens arrive on Snow Chain shortly after.</> },
+                      { n: "05", t: <><strong>Come back here and click Connect.</strong> Snow Chain is added automatically and your balance will appear in the vault.</> },
+                    ].map(s => (
+                      <div className="step-item" key={s.n}>
+                        <span className="step-item-n mono">{s.n}</span>
+                        <span className="step-item-t">{s.t}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div className="side-card">
+                  <div className="card-label mono">Open these links</div>
+                  <div className="notice"><strong>Start with the faucet.</strong> You need testnet INIT before you can bridge or pay for any transactions on L1.</div>
+                  {[
+                    { name: "Initia Faucet ↗", href: "https://app.testnet.initia.xyz/faucet", desc: "Get free testnet INIT" },
+                    { name: "Initia Bridge ↗", href: "https://app.testnet.initia.xyz/bridge", desc: "Move INIT to Snow Chain" },
+                    { name: "Initia Scan ↗", href: "https://scan.testnet.initia.xyz", desc: "Check your L1 transactions" },
+                    { name: "Initia Docs ↗", href: "https://docs.initia.xyz", desc: "Full technical documentation" },
+                  ].map(l => (
+                    <a key={l.name} className="quick-link" href={l.href} target="_blank" rel="noreferrer">
+                      <div className="quick-link-name">{l.name}</div>
+                      <div className="quick-link-desc">{l.desc}</div>
+                    </a>
+                  ))}
+                  <button className="btn-full" onClick={() => { if (address) setSection("vault"); else connect(); }}>
+                    {address ? "Go to Vault" : "Connect Wallet"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VAULT */}
+        {section === "vault" && (
+          !address ? (
+            <div className="connect-gate">
+              <div className="gate-icon">F</div>
+              <h2>Connect to open the vault</h2>
+              <p>Snow Chain gets added to your MetaMask when you connect. Everything happens automatically.</p>
+              <button className="btn-cta" onClick={connect}>Connect Wallet</button>
+            </div>
+          ) : (
+            <div className="vault-wrap">
+              <div className="vault-left">
+                <div>
+                  <div className="section-label">Portfolio overview</div>
+                  <div className="balance-block">
+                    <div className="balance-top">
+                      <div className="balance-live"><span className="live-dot" />Live balance, updates every 3 seconds</div>
+                      <div className="balance-num">{balance}<small>SNW</small></div>
+                    </div>
+                    <div className="balance-row">
+                      <div className="b-stat"><div className="b-stat-l">Yield earned</div><div className="b-stat-v g">+{yieldEarned}</div></div>
+                      <div className="b-stat"><div className="b-stat-l">Annual rate</div><div className="b-stat-v">5.00%</div></div>
+                      <div className="b-stat"><div className="b-stat-l">Lock-up</div><div className="b-stat-v">None</div></div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div className="section-label">Recent transactions</div>
+                  <div className="tx-table">
+                    <div className="tx-head">
+                      <span className="tx-th">Type</span><span className="tx-th">Amount</span><span className="tx-th">Network</span><span className="tx-th">Result</span>
+                    </div>
+                    {status?.type === "ok" ? (
+                      <div className="tx-row">
+                        <span className="tx-td gold mono">TX</span>
+                        <span className="tx-td">{amount || "—"} SNW</span>
+                        <span className="tx-td mono">Snow Chain</span>
+                        <span className="tx-td g">Confirmed</span>
+                      </div>
+                    ) : <div className="empty">Your transactions will appear here.</div>}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <button className="btn-outline" style={{ padding: "10px 20px", fontSize: 12 }} onClick={() => setSection("tools")}>
+                    AI Advisor
+                  </button>
+                  <button className="btn-outline" style={{ padding: "10px 20px", fontSize: 12 }} onClick={() => { setSection("tools"); setActiveTool("simulator"); }}>
+                    Yield Simulator
+                  </button>
+                  <button className="btn-outline" style={{ padding: "10px 20px", fontSize: 12 }} onClick={() => { setSection("tools"); setActiveTool("history"); }}>
+                    Portfolio History
+                  </button>
+                </div>
+              </div>
+              <div className="vault-right">
+                <div>
+                  <div className="section-label">Actions</div>
+                  <div className="form-block">
+                    <label className="f-label">Amount to deposit (SNW)</label>
+                    <input type="number" className="f-input" placeholder="0.0" value={amount} onChange={e => setAmount(e.target.value)} />
+                    <button className="btn-dep" onClick={deposit} disabled={loading || !amount}>{loading ? "Confirming..." : "Deposit into Vault"}</button>
+                    <button className="btn-wth" onClick={withdraw} disabled={loading}>{loading ? "Confirming..." : "Withdraw and Collect Yield"}</button>
+                    {status && <div className={`status-line ${status.type}`}>{status.msg}</div>}
+                  </div>
+                </div>
+                <div>
+                  <div className="section-label">Vault details</div>
+                  <div className="info-block">
+                    {[
+                      { k: "Contract", v: "0x80fc3...dc3aF" },
+                      { k: "Network", v: "Snow Chain" },
+                      { k: "Token", v: "SNW" },
+                      { k: "Yield rate", v: "5% per year" },
+                      { k: "Custody", v: "Non-custodial" },
+                      { k: "Withdrawal lock", v: "None" },
+                      { k: "Protocol fee", v: "0%" },
+                    ].map(d => (
+                      <div className="info-row" key={d.k}>
+                        <span className="info-k">{d.k}</span>
+                        <span className="info-v">{d.v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        )}
+
+        {/* TOOLS */}
+        {section === "tools" && (
+          <div className="tools-layout">
+            <div className="tools-nav">
+              <span className="tool-nav-label">DeFi Tools</span>
+              {toolItems.map(t => (
+                <button key={t.id} className={`tool-nav-item${activeTool === t.id ? " active" : ""}`} onClick={() => setActiveTool(t.id)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="tools-content">
+
+              {/* AI ADVISOR */}
+              {activeTool === "advisor" && (
+                <div className="ai-wrap">
+                  <div className="page-tag">AI Advisor</div>
+                  <h2 className="page-h" style={{ fontSize: 32, marginBottom: 16 }}>Ask anything about your yield</h2>
+                  <p className="ai-desc">
+                    Get personalized advice based on your current vault balance. Ask about the best time to withdraw, how much you could earn, or anything else about your position.
+                    {address && <> Your current balance is <strong style={{ color: "var(--white)" }}>{balance} SNW</strong> with <strong style={{ color: "var(--green)" }}>+{yieldEarned} SNW</strong> yield earned.</>}
+                  </p>
+
+                  <div className="ai-key-wrap">
+                    <label className="f-label">Anthropic API Key (stays in your browser)</label>
+                    <input type="password" className="f-input" style={{ marginBottom: 0 }} placeholder="sk-ant-..." value={apiKey} onChange={e => setApiKey(e.target.value)} />
+                  </div>
+
+                  <div style={{ marginTop: 20 }}>
+                    <label className="f-label">Quick questions</label>
+                    <div className="ai-quick">
+                      {["When should I withdraw?", "How much will I earn in 30 days?", "Is 5% APY good?", "Should I deposit more?"].map(q => (
+                        <button key={q} className="ai-quick-btn" onClick={() => setAiInput(q)}>{q}</button>
+                      ))}
+                    </div>
+                    <textarea className="ai-textarea" placeholder="Ask anything about your position, yield strategy, or how Fortress works..." value={aiInput} onChange={e => setAiInput(e.target.value)} />
+                    <button className="btn-ask" onClick={askAI} disabled={aiLoading || !aiInput.trim() || !apiKey.trim()}>
+                      {aiLoading ? "Thinking..." : "Get Advice"}
+                    </button>
+                  </div>
+
+                  {aiResponse && (
+                    <div className="ai-response">
+                      <div className="ai-label">AI Advisor</div>
+                      {aiResponse}
+                    </div>
+                  )}
+
+                  {!apiKey && (
+                    <p style={{ marginTop: 20, fontSize: 12, color: "var(--gray)", fontFamily: "IBM Plex Mono, monospace" }}>
+                      Get your API key at console.anthropic.com. It stays in your browser and is never stored.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* SIMULATOR */}
+              {activeTool === "simulator" && (
+                <div>
+                  <div className="page-tag">Yield Simulator</div>
+                  <h2 className="page-h" style={{ fontSize: 32, marginBottom: 32 }}>See what you could earn</h2>
+
+                  <div className="sim-controls">
+                    <div className="sim-group">
+                      <label className="sim-label">Deposit amount (SNW)</label>
+                      <input type="number" className="sim-input" value={simAmount} onChange={e => setSimAmount(e.target.value)} placeholder="1000" />
+                    </div>
+                    <div className="sim-group">
+                      <label className="sim-label">Time period: {simDays} days</label>
+                      <input type="range" className="sim-range" min={1} max={730} value={simDays} onChange={e => setSimDays(parseInt(e.target.value))} />
+                    </div>
+                  </div>
+
+                  <div className="sim-results">
+                    <div className="sim-result">
+                      <div className="sim-result-l">You deposit</div>
+                      <div className="sim-result-v">{parseFloat(simAmount || "0").toFixed(2)}</div>
+                      <div style={{ fontSize: 11, color: "var(--gray)", fontFamily: "IBM Plex Mono", marginTop: 4 }}>SNW</div>
+                    </div>
+                    <div className="sim-result">
+                      <div className="sim-result-l">Yield earned</div>
+                      <div className="sim-result-v gold">+{simYield(parseFloat(simAmount || "0"), simDays).toFixed(4)}</div>
+                      <div style={{ fontSize: 11, color: "var(--gray)", fontFamily: "IBM Plex Mono", marginTop: 4 }}>SNW</div>
+                    </div>
+                    <div className="sim-result">
+                      <div className="sim-result-l">Total after {simDays}d</div>
+                      <div className="sim-result-v green">{simTotal(parseFloat(simAmount || "0"), simDays).toFixed(4)}</div>
+                      <div style={{ fontSize: 11, color: "var(--gray)", fontFamily: "IBM Plex Mono", marginTop: 4 }}>SNW</div>
+                    </div>
+                  </div>
+
+                  <div className="section-label" style={{ marginBottom: 12 }}>Earnings over time</div>
+                  <SimChart />
+                  <p style={{ marginTop: 12, fontSize: 12, color: "var(--gray)", fontFamily: "IBM Plex Mono" }}>Based on 5% APY, paid continuously. No lock-up. Withdraw anytime.</p>
+                </div>
+              )}
+
+              {/* LEADERBOARD */}
+              {activeTool === "leaderboard" && (
+                <div>
+                  <div className="page-tag">Leaderboard</div>
+                  <h2 className="page-h" style={{ fontSize: 32, marginBottom: 32 }}>Top depositors on Snow Chain</h2>
+
+                  <div className="lb-table">
+                    <div className="lb-head">
+                      <span className="lb-th">#</span>
+                      <span className="lb-th">Address</span>
+                      <span className="lb-th">Deposited</span>
+                      <span className="lb-th">Yield earned</span>
+                      <span className="lb-th">Days</span>
+                    </div>
+                    {MOCK_LEADERBOARD.map((r, i) => (
+                      <div className="lb-row" key={r.rank} style={{ background: address && r.addr.startsWith(address.slice(0, 6)) ? "var(--gold2)" : undefined }}>
+                        <span className={`lb-rank${i === 0 ? " gold" : i === 1 ? " silver" : i === 2 ? " bronze" : ""}`}>{r.rank}</span>
+                        <span className="lb-td mono">{r.addr}</span>
+                        <span className="lb-td">{r.deposited} SNW</span>
+                        <span className="lb-td green">+{r.earned}</span>
+                        <span className="lb-td mono">{r.days}d</span>
+                      </div>
+                    ))}
+                    <div className="lb-notice mono">Updated every block · Snow Chain · snow-1</div>
+                  </div>
+                </div>
+              )}
+
+              {/* HISTORY */}
+              {activeTool === "history" && (
+                <div>
+                  <div className="page-tag">Portfolio History</div>
+                  <h2 className="page-h" style={{ fontSize: 32, marginBottom: 24 }}>Your balance over time</h2>
+
+                  <div className="hist-stats">
+                    <div className="hist-stat">
+                      <div className="hist-stat-l">Current balance</div>
+                      <div className="hist-stat-v">{balance} SNW</div>
+                    </div>
+                    <div className="hist-stat">
+                      <div className="hist-stat-l">Total yield</div>
+                      <div className="hist-stat-v g">+{yieldEarned}</div>
+                    </div>
+                    <div className="hist-stat">
+                      <div className="hist-stat-l">Data points</div>
+                      <div className="hist-stat-v">{history.length}</div>
+                    </div>
+                  </div>
+
+                  <div className="section-label" style={{ marginBottom: 12 }}>Balance history</div>
+                  <HistoryChart />
+                  <p style={{ marginTop: 12, fontSize: 12, color: "var(--gray)", fontFamily: "IBM Plex Mono" }}>
+                    Tracked locally in your browser · Updates every 3 seconds while connected
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ABOUT */}
+        {section === "about" && (
+          <div className="wrap">
+            <div className="page-head">
+              <div><div className="page-tag">About</div><h2 className="page-h">What is Fortress</h2></div>
+              <p className="page-sub">A yield vault that anyone can use. Built on Snow Chain, connected to Initia's cross-chain infrastructure.</p>
+            </div>
+            <div className="about-cells">
+              <div className="a-cell">
+                <div className="a-tag">The problem</div>
+                <h3 className="a-h">DeFi asks too much of you upfront</h3>
+                <p className="a-p">
+                  Most DeFi apps greet you with a wall of terminology, five approval steps, and a bridge that takes an hour. By the time you figure it out, you've already given up.
+                  <br /><br />
+                  The sad part is that <strong>none of that friction is technically necessary.</strong> It's just what happens when products are built by engineers for engineers.
+                </p>
+              </div>
+              <div className="a-cell">
+                <div className="a-tag">What we did about it</div>
+                <h3 className="a-h">One screen. One action. Done.</h3>
+                <p className="a-p">
+                  Fortress runs on Snow Chain — an EVM appchain on Initia with 100ms blocks and native bridging from L1.
+                  <br /><br />
+                  Connect your wallet. Deposit. Watch your balance grow. Pull it back whenever you feel like it.
+                  <strong> Your principal and all earned yield come back in one transaction.</strong> That's the whole app.
+                </p>
+              </div>
+              <div className="a-cell">
+                <div className="a-tag">Snow Chain</div>
+                <h3 className="a-h">Fast, cheap, and EVM-compatible</h3>
+                <p className="a-p">
+                  Snow Chain is a custom EVM rollup on Initia. It settles to Initia L1, bridges assets natively through the Interwoven Bridge, and runs Solidity smart contracts without any modifications.
+                  <br /><br />
+                  <strong>Fortress is the first application deployed on it.</strong> Blocks come every 100 milliseconds. Transactions cost fractions of a cent.
+                </p>
+              </div>
+              <div className="a-cell">
+                <div className="a-tag">What comes next</div>
+                <h3 className="a-h">Version 1 is just the beginning</h3>
+                <p className="a-p">
+                  Right now the vault earns a fixed 5% per year. Simple and predictable.
+                  <br /><br />
+                  Next: <strong>live yield strategies</strong> that route your deposits into real DeFi protocols, <strong>auto-compounding</strong> so earnings reinvest automatically, and <strong>session keys</strong> so power users never see a wallet popup again.
+                </p>
+              </div>
+            </div>
+            <div className="tech-cells">
+              {[
+                { name: "Solidity", desc: "Smart contract" },
+                { name: "Initia EVM", desc: "Snow Chain execution" },
+                { name: "Interwoven Bridge", desc: "L1 to Snow Chain" },
+                { name: "Next.js 16", desc: "Frontend framework" },
+                { name: "Ethers.js v6", desc: "Wallet and contract" },
+                { name: "Claude AI", desc: "AI yield advisor" },
+              ].map(t => (
+                <div className="t-cell" key={t.name}>
+                  <div className="t-name">{t.name}</div>
+                  <div className="t-desc">{t.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <footer>
+          <div className="foot-left">
+            <span className="foot-copy">© 2026 Fortress</span>
+            <button className="foot-link" onClick={() => setSection("how")}>How it works</button>
+            <button className="foot-link" onClick={() => setSection("bridge")}>Bridge</button>
+            <button className="foot-link" onClick={() => setSection("tools")}>Tools</button>
+            <button className="foot-link" onClick={() => setSection("about")}>About</button>
+            <a className="foot-link" href="https://docs.initia.xyz" target="_blank" rel="noreferrer">Initia Docs ↗</a>
+          </div>
+          <div className="foot-right">
+            <span className="foot-tag">Snow Chain</span>
+            <span className="foot-tag">SNW</span>
+            <span className="foot-tag">Initia EVM</span>
+          </div>
+        </footer>
+      </div>
+    </>
+  );
+}
