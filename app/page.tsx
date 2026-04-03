@@ -254,10 +254,10 @@ export default function Fortress() {
   function removeApiKey() { localStorage.removeItem("fortress_api_key"); setApiKey(""); setApiKeySaved(false); }
 
   async function askAI() {
-    if (!aiInput.trim() || !apiKey.trim()) return;
-    setAiLoading(true); setAiResponse("");
-    try {
-      const prompt = `You are the AI advisor for Fortress, a DeFi yield vault on Snow Chain — an EVM appchain on Initia.
+  if (!aiInput.trim() || !apiKey.trim()) return;
+  setAiLoading(true); setAiResponse("");
+  try {
+    const prompt = `You are the AI advisor for Fortress, a DeFi yield vault on Snow Chain — an EVM appchain on Initia.
 
 FORTRESS: Non-custodial yield vault. Users deposit SNW tokens, earn 5% APY per second, withdraw principal + yield anytime. No lock-up. No fees. Contract: 0xbEB954154E79FF4B124715E9E2568aFDf7340D08.
 USER: ${address ? `Wallet: ${address}` : "Not connected"}. Vault: ${balance} SNW. Yield: +${yieldEarned} SNW. Wallet: ${walletBalance} SNW.
@@ -266,12 +266,13 @@ INITIA: L1 blockchain. Testnet: initiation-2. Interwoven Bridge for L1↔Snow Ch
 SNW USES: Snow Chain gas token. Used to pay transaction fees on Snow Chain. Depositable in Fortress vault for yield. First token on Snow Chain.
 
 Answer in 2-4 clear sentences. No jargon. Be specific with numbers when relevant. Question: ${aiInput}`;
-      const res = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, apiKey }) });
-      const data = await res.json();
-      setAiResponse(data.content?.[0]?.text ?? "Something went wrong.");
-    } catch { setAiResponse("Could not reach the AI. Check your API key."); }
-    setAiLoading(false);
-  }
+
+    const res = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
+    const data = await res.json();
+    setAiResponse(data.content?.[0]?.text ?? "Something went wrong.");
+  } catch { setAiResponse("Could not reach the AI. Check your API key."); }
+  setAiLoading(false);
+}
 
   const simYield = (amt: number, days: number) => (amt * 0.05 * days) / 365;
   const simTotal = (amt: number, days: number) => amt + simYield(amt, days);
@@ -1045,12 +1046,6 @@ Answer in 2-4 clear sentences. No jargon. Be specific with numbers when relevant
                     Get answers about your vault, yield strategy, Snow Chain, or Initia.
                     {address && <> Your balance: <strong style={{ color: "var(--white)" }}>{balance} SNW</strong> · Yield: <strong style={{ color: "var(--green)" }}>+{yieldEarned}</strong></>}
                   </p>
-                  <div className="f-label" style={{ marginBottom: 6 }}>Anthropic API Key</div>
-                  <div className="ai-key-row">
-                    <input type="password" className="ai-key-inp" placeholder="sk-ant-..." value={apiKey} onChange={e => setApiKey(e.target.value)} />
-                    {!apiKeySaved ? <button className="btn-save" onClick={saveApiKey}>Save</button> : <button className="btn-remove" onClick={removeApiKey}>Remove</button>}
-                  </div>
-                  {apiKeySaved && <p style={{ fontSize: 11, color: "var(--green)", fontFamily: "IBM Plex Mono", marginBottom: 16 }}>Saved in browser.</p>}
                   <div style={{ height: 16 }} />
                   <div className="f-label" style={{ marginBottom: 8 }}>Quick questions</div>
                   <div className="ai-quick">
@@ -1068,7 +1063,6 @@ Answer in 2-4 clear sentences. No jargon. Be specific with numbers when relevant
                       {aiResponse}
                     </div>
                   )}
-                  {!apiKey && <p style={{ marginTop: 16, fontSize: 11, color: "var(--muted)", fontFamily: "IBM Plex Mono" }}>Get your key at console.anthropic.com. Saved locally only.</p>}
                 </div>
               )}
 
