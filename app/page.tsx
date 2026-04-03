@@ -5,7 +5,7 @@ import { ethers } from "ethers";
 
 const CONTRACT = "0xbEB954154E79FF4B124715E9E2568aFDf7340D08";
 const CHAIN_ID_HEX = "0x8df38dd443ebb";
-const RPC = "http://localhost:8545";
+const RPC = "http://jerrie-rhizocarpous-myrtie.ngrok-free.app";
 const GAS_STATION = "0xBd33C81E9c15f9554140bF49bDF3db6269E094f5";
 
 type Section = "home" | "how" | "bridge" | "vault" | "faucet" | "tools" | "about";
@@ -842,8 +842,8 @@ function HeroCanvas() {
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 40px 40px 0" }}>
-        <canvas id="hero-canvas" style={{ width: "100%", height: "480px", display: "block" }} />
-      </div>
+  <canvas id="hero-canvas" style={{ width: "100%", height: "480px", display: "block" }} />
+</div>
     </div>
     <div className="metrics">
       <div className="metric"><div className="metric-n">5%</div><div className="metric-l">Annual yield</div></div>
