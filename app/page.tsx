@@ -350,88 +350,49 @@ function HeroCanvas() {
     const ctx = canvas.getContext("2d")!;
     const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
     resize();
-    const W = () => canvas.width, H = () => canvas.height;
-    let t = 0, phase = 0, phaseT = 0;
+    let t = 0;
 
-    function drawSphere(a: number) {
-      const cx = W()/2, cy = H()/2;
+    function draw() {
+      const W = canvas.width, H = canvas.height;
+      const cx = W / 2, cy = H / 2;
+      ctx.clearRect(0, 0, W, H);
+
+      // Rotating sphere — rings spin around Y axis
       for (let i = 0; i < 14; i++) {
         const tilt = (i / 14) * Math.PI;
-        const oy = Math.cos(tilt) * 180;
-        const rx = Math.sin(tilt) * 180;
+        const oy = Math.cos(tilt) * 160;
+        const rx = Math.sin(tilt) * 160;
         if (rx < 3) continue;
-        const op = (0.15 + (rx / 180) * 0.55) * a;
-        ctx.save(); ctx.translate(cx, cy);
+        const op = 0.1 + (rx / 160) * 0.6;
+        const rotAngle = t * 0.008 + i * 0.05;
+        ctx.save();
+        ctx.translate(cx, cy);
         ctx.strokeStyle = `rgba(196,169,107,${op})`;
-        ctx.lineWidth = 0.9;
+        ctx.lineWidth = 0.8;
         ctx.beginPath();
-        ctx.ellipse(0, oy, rx, rx * 0.28, t * 0.004, 0, Math.PI * 2);
-        ctx.stroke(); ctx.restore();
+        ctx.ellipse(
+          Math.sin(rotAngle) * 0,
+          oy,
+          rx * Math.abs(Math.cos(t * 0.008)),
+          rx * 0.3,
+          rotAngle,
+          0,
+          Math.PI * 2
+        );
+        ctx.stroke();
+        ctx.restore();
       }
-    }
 
-    function drawSpiral(a: number) {
-      const cx = W()/2, cy = H()/2;
-      for (let i = 0; i < 11; i++) {
-        const xo = (i - 5) * 38;
-        const rx = 160 - Math.abs(xo) * 0.5;
-        if (rx < 5) continue;
-        const op = (0.12 + (1 - Math.abs(xo) / 200) * 0.5) * a;
-        ctx.save(); ctx.translate(cx + xo, cy);
-        ctx.strokeStyle = `rgba(196,169,107,${op})`;
-        ctx.lineWidth = 0.9;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, rx * 0.32, rx, t * 0.005 + i * 0.18, 0, Math.PI * 2);
-        ctx.stroke(); ctx.restore();
-      }
-    }
-
-    function drawPolygon(a: number) {
-      const cx = W()/2, cy = H()/2;
-      for (let i = 0; i < 11; i++) {
-        const size = 80 + i * 18;
-        const angle = t * 0.005 + i * 0.3;
-        const op = (0.08 + i * 0.022) * a;
-        ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle);
-        ctx.strokeStyle = `rgba(196,169,107,${op})`;
-        ctx.lineWidth = 0.9;
-        ctx.beginPath();
-        const sides = 5 + (i % 3);
-        for (let j = 0; j <= sides; j++) {
-          const ang = (j / sides) * Math.PI * 2;
-          j === 0 ? ctx.moveTo(Math.cos(ang)*size, Math.sin(ang)*size*0.65)
-                  : ctx.lineTo(Math.cos(ang)*size, Math.sin(ang)*size*0.65);
-        }
-        ctx.closePath(); ctx.stroke(); ctx.restore();
-      }
-    }
-
-    let animId: number;
-    function draw() {
-      ctx.clearRect(0, 0, W(), H());
-      phaseT++;
-      if (phaseT > 240) { phase = (phase + 1) % 3; phaseT = 0; }
-      const a = Math.min(phaseT / 50, 1) * (phaseT > 190 ? 1 - (phaseT - 190) / 50 : 1);
-      if (phase === 0) drawSphere(a);
-      if (phase === 1) drawSpiral(a);
-      if (phase === 2) drawPolygon(a);
-      if (phaseT > 190) {
-        const na = (phaseT - 190) / 50;
-        const np = (phase + 1) % 3;
-        if (np === 0) drawSphere(na);
-        if (np === 1) drawSpiral(na);
-        if (np === 2) drawPolygon(na);
-      }
       t++;
-      animId = requestAnimationFrame(draw);
+      requestAnimationFrame(draw);
     }
-    draw();
+
+    let animId = requestAnimationFrame(draw);
     window.addEventListener("resize", resize);
     return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", resize); };
   }, []);
   return null;
 }
-
   return (
     <>
       <style>{`
