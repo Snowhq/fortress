@@ -76,7 +76,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 const CONTRACT = "0x80D0b7552FB728fBb2B7ad6Fbef49eeb09845c25";
 const CHAIN_ID_HEX = "0x8df38dd443ebb";
-const RPC = "http://localhost:8545";
 const GAS_STATION = "0xBd33C81E9c15f9554140bF49bDF3db6269E094f5";
 
 type Section = "home" | "how" | "bridge" | "vault" | "faucet" | "tools" | "about";
@@ -141,7 +140,7 @@ export default function Fortress() {
   async function refresh(addr: string) {
     try {
       const { ethers } = await import("ethers");
-      const provider = new ethers.JsonRpcProvider(RPC);
+      const provider = new ethers.BrowserProvider(window.ethereum)
       const abi = ["function balances(address) view returns (uint256)", "function calculateYield(address) view returns (uint256)"];
       const c = new ethers.Contract(CONTRACT, abi, provider);
       const [bal, yld, walBal] = await Promise.all([c.balances(addr), c.calculateYield(addr), provider.getBalance(addr)]);
@@ -158,7 +157,7 @@ export default function Fortress() {
   async function fetchLeaderboard() {
     try {
       const { ethers } = await import("ethers");
-      const provider = new ethers.JsonRpcProvider(RPC);
+      const provider = new ethers.BrowserProvider(window.ethereum)
       const abi = ["function balances(address) view returns (uint256)", "function calculateYield(address) view returns (uint256)", "event Deposited(address indexed user, uint256 amount)"];
       const c = new ethers.Contract(CONTRACT, abi, provider);
       const events = await c.queryFilter(c.filters.Deposited(), 0, "latest");

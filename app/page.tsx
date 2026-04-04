@@ -69,7 +69,7 @@ export default function Fortress() {
 
   async function refresh(addr: string) {
   try {
-    const provider = new ethers.JsonRpcProvider(RPC);
+    const provider = new ethers.BrowserProvider((window as any).ethereum);
 
     const abi = [
       "function balances(address) view returns (uint256)",
@@ -98,7 +98,7 @@ export default function Fortress() {
 
   async function fetchLeaderboard() {
   try {
-    const provider = new ethers.JsonRpcProvider(RPC);
+    const provider = new ethers.BrowserProvider((window as any).ethereum);
 
     const abi = [
       "function balances(address) view returns (uint256)",
