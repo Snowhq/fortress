@@ -1247,25 +1247,25 @@ function HeroCanvas() {
             </div>
             <div className="about-grid">
               <div className="about-cell">
-                <div className="a-tag">The problem</div>
-                <h3 className="a-h">DeFi asks too much upfront</h3>
-                <p className="a-p">Most DeFi apps greet you with a wall of terminology, five approval steps, and a bridge that takes an hour.<br /><br /><strong>None of that friction is technically necessary.</strong> It's what happens when products are built by engineers for engineers.</p>
-              </div>
-              <div className="about-cell">
-                <div className="a-tag">Our approach</div>
-                <h3 className="a-h">One screen. One action. Done.</h3>
-                <p className="a-p">Fortress runs on Snow Chain — an EVM appchain on Initia with 100ms blocks and native bridging from L1.<br /><br />Connect. Deposit. Watch your balance grow. <strong>Principal and yield back in one transaction.</strong></p>
-              </div>
-              <div className="about-cell">
-                <div className="a-tag">Snow Chain</div>
-                <h3 className="a-h">Fast, cheap, EVM-compatible</h3>
-                <p className="a-p">Custom EVM rollup on Initia. Settles to L1, bridges natively through Interwoven Bridge, runs Solidity without modifications.<br /><br /><strong>Fortress is the first app deployed on it.</strong></p>
-              </div>
-              <div className="about-cell">
-                <div className="a-tag">What's next</div>
-                <h3 className="a-h">Version 1 is just the start</h3>
-                <p className="a-p">Fixed 5% APY today. Simple and predictable.<br /><br />Next: <strong>live yield strategies</strong> routing into real DeFi protocols, <strong>auto-compounding</strong>, and <strong>session keys</strong> so power users never see a wallet popup again.</p>
-              </div>
+  <div className="a-tag">Why we built this</div>
+  <h3 className="a-h">DeFi should take 30 seconds, not 30 minutes</h3>
+  <p className="a-p">Most yield products bury you in steps before you earn a single cent. Fortress strips it down to the minimum — connect, deposit, collect. That's it.</p>
+</div>
+<div className="about-cell">
+  <div className="a-tag">How it works</div>
+  <h3 className="a-h">Your money works while you don't</h3>
+  <p className="a-p">Every second your SNW sits in the vault, it earns. No lock-up. No approval windows. When you want out, one transaction sends everything back — principal and yield together.</p>
+</div>
+<div className="about-cell">
+  <div className="a-tag">The infrastructure</div>
+  <h3 className="a-h">Built on Snow Chain, settled on Initia</h3>
+  <p className="a-p">Snow Chain is an EVM rollup on Initia with 100ms blocks and near-zero fees. Fortress is the first app deployed on it — fast enough that yield updates feel instant.</p>
+</div>
+<div className="about-cell">
+  <div className="a-tag">What's coming</div>
+  <h3 className="a-h">Version 1 is the foundation</h3>
+  <p className="a-p">Fixed 5% APY is just the start. Next: live yield strategies routing into real protocols, auto-compounding so earnings stack automatically, and session keys so you never see a wallet popup again.</p>
+</div>
             </div>
             <div className="tech-grid">
               {[
