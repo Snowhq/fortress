@@ -5,7 +5,7 @@ import { ethers } from "ethers";
 
 const CONTRACT = "0xbEB954154E79FF4B124715E9E2568aFDf7340D08";
 const CHAIN_ID_HEX = "0x8df38dd443ebb";
-const RPC = "https://jerrie-rhizocarpous-myrtie.ngrok-free.dev";
+const RPC = "http://jerrie-rhizocarpous-myrtie.ngrok-free.app";
 const GAS_STATION = "0xBd33C81E9c15f9554140bF49bDF3db6269E094f5";
 
 type Section = "home" | "how" | "bridge" | "vault" | "faucet" | "tools" | "about";
@@ -220,12 +220,12 @@ export default function Fortress() {
       ["function withdraw(uint256 amount)"],
       signer
     );
-const tx = await c.withdraw(ethers.parseEther(amount));
+    const tx = await c.withdraw(ethers.parseEther(amount));
     setStatus({ type: "info", msg: "Almost there, waiting for confirmation..." });
-    const receipt = await tx.wait();
+    await tx.wait();
     await refresh(address);
-    saveTx({ type: "Withdraw", amount: `${amount} SNW + yield`, hash: receipt.hash, time: Date.now(), status: "Confirmed" });
     setStatus({ type: "ok", msg: `${amount} SNW + yield sent back to your wallet.` });
+    setAmount("");
   } catch (e: any) {
     setStatus({ type: "err", msg: e.message?.slice(0, 120) ?? "Something went wrong." });
   }
@@ -254,7 +254,7 @@ const tx = await c.withdraw(ethers.parseEther(amount));
   function removeApiKey() { localStorage.removeItem("fortress_api_key"); setApiKey(""); setApiKeySaved(false); }
 
   async function askAI() {
-  if (!aiInput.trim()) return;
+  if (!aiInput.trim() || !apiKey.trim()) return;
   setAiLoading(true); setAiResponse("");
   try {
     const prompt = `You are the AI advisor for Fortress, a DeFi yield vault on Snow Chain — an EVM appchain on Initia.
