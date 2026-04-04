@@ -1034,7 +1034,7 @@ function HeroCanvas() {
                   <div className="sec-label">Vault details</div>
                   <div className="vault-details">
                     {[
-                      { k: "Contract", v: "0x80D0b...45c25" },
+                      { k: "Contract", v: "0xbEB95...0D08" },
                       { k: "Network", v: "Snow Chain" },
                       { k: "Token", v: "SNW" },
                       { k: "Yield rate", v: "5% per year" },
@@ -1145,7 +1145,7 @@ function HeroCanvas() {
                     ))}
                   </div>
                   <textarea className="ai-ta" placeholder="Ask anything about Fortress, Snow Chain, or Initia..." value={aiInput} onChange={e => setAiInput(e.target.value)} />
-                  <button className="btn-ask" onClick={askAI} disabled={aiLoading || !aiInput.trim() || !apiKey.trim()}>
+                  <button className="btn-ask" onClick={askAI} disabled={aiLoading || !aiInput.trim()}>
                     {aiLoading ? "Thinking..." : "Get Answer"}
                   </button>
                   {aiResponse && (
