@@ -3,9 +3,9 @@ import { useInterwovenKit } from "@initia/interwovenkit-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ethers } from "ethers";
 
-const CONTRACT = "0xbEB954154E79FF4B124715E9E2568aFDf7340D08";
+const CONTRACT = "0x80fc3f9E5Aa513cB3DAfa721D8236A0e791dc3aF";
 const CHAIN_ID_HEX = "0x8df38dd443ebb";
-const RPC = "https://jerrie-rhizocarpous-myrtie.ngrok-free.dev";
+const RPC = "https://fortress-node-production.up.railway.app";
 const GAS_STATION = "0xBd33C81E9c15f9554140bF49bDF3db6269E094f5";
 
 type Section = "home" | "how" | "bridge" | "vault" | "faucet" | "tools" | "about";

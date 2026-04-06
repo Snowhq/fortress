@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const RPC = process.env.RPC_URL || "http://localhost:8545";
+const RPC = "https://fortress-node-production.up.railway.app";
 const PRIVATE_KEY = process.env.FAUCET_PRIVATE_KEY || "";
 const MAX_AMOUNT = 1000;
 
