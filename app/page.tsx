@@ -1034,7 +1034,7 @@ function HeroCanvas() {
                   <div className="sec-label">Vault details</div>
                   <div className="vault-details">
                     {[
-                      { k: "Contract", v: "0xbEB95...0D08" },
+                      { k: "Contract", v: "0x80fc3...c3aF" },
                       { k: "Network", v: "Snow Chain" },
                       { k: "Token", v: "SNW" },
                       { k: "Yield rate", v: "5% per year" },
