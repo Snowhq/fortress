@@ -261,7 +261,7 @@ const tx = await c.withdraw(ethers.parseEther(amount));
 
 FORTRESS: Non-custodial yield vault. Users deposit SNW tokens, earn 5% APY per second, withdraw principal + yield anytime. No lock-up. No fees. Contract: 0xbEB954154E79FF4B124715E9E2568aFDf7340D08.
 USER: ${address ? `Wallet: ${address}` : "Not connected"}. Vault: ${balance} SNW. Yield: +${yieldEarned} SNW. Wallet: ${walletBalance} SNW.
-SNOW CHAIN: EVM rollup on Initia. 100ms blocks. SNW native token. Chain ID: snow-1. RPC: localhost:8545.
+SNOW CHAIN: EVM rollup on Initia. 100ms blocks. SNW native token. Chain ID: snow-1. RPC: fortress-node-production.up.railway.app.
 INITIA: L1 blockchain. Testnet: initiation-2. Interwoven Bridge for L1↔Snow Chain transfers. Faucet: app.testnet.initia.xyz/faucet. Bridge: bridge.testnet.initia.xyz.
 SNW USES: Snow Chain gas token. Used to pay transaction fees on Snow Chain. Depositable in Fortress vault for yield. First token on Snow Chain.
 
