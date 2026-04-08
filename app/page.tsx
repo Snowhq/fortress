@@ -470,6 +470,16 @@ function HeroCanvas() {
           --red:#f87171;
           --red2:rgba(248,113,113,0.08);
           --blue:#60a5fa;
+          body.light{
+  --bg:#f8f8f8;
+  --surface:#ffffff;
+  --surface2:#f0f0f0;
+  --surface3:#e0e0e0;
+  --white:#08080a;
+  --muted:#666666;
+  --muted2:#999999;
+  --line:rgba(0,0,0,0.08);
+}
         }
 
         html,body{background:var(--bg);color:var(--white);font-family:'Space Grotesk',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
@@ -848,7 +858,10 @@ function HeroCanvas() {
 </div>
         <div className="nav-right">
           <div className="chain-badge"><span className="live-dot" />Snow Chain</div>
-          <button className="theme-toggle" onClick={() => setDarkMode(!darkMode)}>{darkMode ? "☀️" : "🌙"}</button>
+          <button className="theme-toggle" onClick={() => {
+  setDarkMode(!darkMode);
+  document.body.classList.toggle("light");
+}}>{darkMode ? "☀️" : "🌙"}</button>
           {address ? (
             <>
               <div className="addr-badge" onClick={() => setSection("vault")}>{shortAddr}</div>
@@ -864,7 +877,7 @@ function HeroCanvas() {
     <button key={n.id} className="mobile-link" onClick={() => { setSection(n.id); setMobileMenu(false); }}>{n.label}</button>
   ))}
 </div>
-      <div className="page" style={{ filter: darkMode ? "none" : "invert(1) hue-rotate(180deg)" }}>
+      <div className="page">
 
         {/* HOME */}
 {section === "home" && (
