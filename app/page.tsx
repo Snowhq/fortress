@@ -135,6 +135,18 @@ setTvl(parseFloat(ethers.formatEther(contractBal)).toFixed(0));
 }
 
   useEffect(() => { if (activeTool === "leaderboard") fetchLeaderboard(); }, [activeTool]);
+  useEffect(() => {
+  async function fetchTvl() {
+    try {
+      const provider = new ethers.JsonRpcProvider(RPC);
+      const contractBal = await provider.getBalance(CONTRACT);
+      setTvl(parseFloat(ethers.formatEther(contractBal)).toFixed(0));
+    } catch {}
+  }
+  fetchTvl();
+  const interval = setInterval(fetchTvl, 10000);
+  return () => clearInterval(interval);
+}, []);
 
   async function connect() {
     try {
@@ -852,7 +864,7 @@ function HeroCanvas() {
     <button key={n.id} className="mobile-link" onClick={() => { setSection(n.id); setMobileMenu(false); }}>{n.label}</button>
   ))}
 </div>
-      <div className="page">
+      <div className="page" style={{ filter: darkMode ? "none" : "invert(1) hue-rotate(180deg)" }}>
 
         {/* HOME */}
 {section === "home" && (
@@ -866,6 +878,7 @@ function HeroCanvas() {
         <div className="hero-actions">
           <button className="btn-primary" onClick={connect}>Open Vault</button>
           <button className="btn-secondary" onClick={() => setSection("how")}>How it works</button>
+          <style>{darkMode ? "" : "img, canvas, video { filter: invert(1) hue-rotate(180deg); }"}</style>
         </div>
         <div className="built-on">
           <span className="built-label">Powered by</span>
