@@ -69,7 +69,7 @@ export default function Fortress() {
 
   async function refresh(addr: string) {
   try {
-    const provider = new ethers.BrowserProvider((window as any).ethereum);
+    const provider = new ethers.JsonRpcProvider(RPC);
 
     const abi = [
       "function balances(address) view returns (uint256)",
@@ -98,7 +98,7 @@ export default function Fortress() {
 
   async function fetchLeaderboard() {
   try {
-    const provider = new ethers.BrowserProvider((window as any).ethereum);
+    const provider = new ethers.JsonRpcProvider(RPC);
 
     const abi = [
       "function balances(address) view returns (uint256)",
@@ -168,7 +168,7 @@ export default function Fortress() {
   setStatus({ type: "info", msg: "Sending deposit to Snow Chain..." });
 
   try {
-    const provider = new ethers.BrowserProvider((window as any).ethereum);
+    const provider = new ethers.JsonRpcProvider(RPC);
     const signer = await provider.getSigner();
 
     const c = new ethers.Contract(
@@ -213,7 +213,7 @@ export default function Fortress() {
   setStatus({ type: "info", msg: "Preparing your withdrawal..." });
   try {
     const { ethers } = await import("ethers");
-    const provider = new ethers.BrowserProvider((window as any).ethereum);
+    const provider = new ethers.JsonRpcProvider(RPC);
     const signer = await provider.getSigner();
     const c = new ethers.Contract(
       CONTRACT,
