@@ -67,38 +67,32 @@ export default function Fortress() {
     } catch {}
   }, []);
 
-  async function refresh(addr: string) {
+async function refresh(addr: string) {
   try {
-    const provider = new ethers.JsonRpcProvider(RPC);
-
+    const readProvider = new ethers.JsonRpcProvider(RPC);
+    const walletProvider = new ethers.BrowserProvider((window as any).ethereum);
     const abi = [
       "function balances(address) view returns (uint256)",
       "function calculateYield(address) view returns (uint256)"
     ];
-
-    const c = new ethers.Contract(CONTRACT, abi, provider);
-
+    const c = new ethers.Contract(CONTRACT, abi, readProvider);
     const [bal, yld, walBal] = await Promise.all([
       c.balances(addr),
       c.calculateYield(addr),
-      provider.getBalance(addr)
+      readProvider.getBalance(addr)
     ]);
-
     const balNum = parseFloat(ethers.formatEther(bal));
     const yldNum = parseFloat(ethers.formatEther(yld));
     const walNum = parseFloat(ethers.formatEther(walBal));
-
     setBalance(balNum.toFixed(4));
     setYieldEarned(yldNum.toFixed(6));
     setWalletBalance(walNum.toFixed(4));
-
     if (balNum > 0) saveSnapshot(balNum, yldNum);
   } catch {}
 }
-
   async function fetchLeaderboard() {
   try {
-    const provider = new ethers.JsonRpcProvider(RPC);
+    const provider = new ethers.BrowserProvider((window as any).ethereum);
 
     const abi = [
       "function balances(address) view returns (uint256)",
@@ -168,7 +162,7 @@ export default function Fortress() {
   setStatus({ type: "info", msg: "Sending deposit to Snow Chain..." });
 
   try {
-    const provider = new ethers.JsonRpcProvider(RPC);
+    const provider = new ethers.BrowserProvider((window as any).ethereum);
     const signer = await provider.getSigner();
 
     const c = new ethers.Contract(
@@ -213,7 +207,7 @@ export default function Fortress() {
   setStatus({ type: "info", msg: "Preparing your withdrawal..." });
   try {
     const { ethers } = await import("ethers");
-    const provider = new ethers.JsonRpcProvider(RPC);
+    const provider = new ethers.BrowserProvider((window as any).ethereum);
     const signer = await provider.getSigner();
     const c = new ethers.Contract(
       CONTRACT,
