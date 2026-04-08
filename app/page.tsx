@@ -39,6 +39,11 @@ export default function Fortress() {
   const [faucetStatus, setFaucetStatus] = useState<{ type: "ok" | "err" | "info"; msg: string } | null>(null);
   const [faucetLoading, setFaucetLoading] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [tvl, setTvl] = useState("0");
+const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
+const [mobileMenu, setMobileMenu] = useState(false);
+const [darkMode, setDarkMode] = useState(true);
+const [autoCompound, setAutoCompound] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("fortress_address");
@@ -87,6 +92,8 @@ async function refresh(addr: string) {
     setBalance(balNum.toFixed(4));
     setYieldEarned(yldNum.toFixed(6));
     setWalletBalance(walNum.toFixed(4));
+    const contractBal = await readProvider.getBalance(CONTRACT);
+setTvl(parseFloat(ethers.formatEther(contractBal)).toFixed(0));
     if (balNum > 0) saveSnapshot(balNum, yldNum);
   } catch {}
 }
@@ -147,7 +154,10 @@ async function refresh(addr: string) {
     setSection("home");
     if (intervalRef.current) clearInterval(intervalRef.current);
   }
-
+function showToast(msg: string, type: "ok" | "err") {
+  setToast({ msg, type });
+  setTimeout(() => setToast(null), 4000);
+}
   function saveTx(tx: Tx) {
     const stored = JSON.parse(localStorage.getItem("fortress_tx_history") || "[]");
     const updated = [tx, ...stored].slice(0, 50);
@@ -190,6 +200,7 @@ async function refresh(addr: string) {
     });
 
     setStatus({ type: "ok", msg: `${amount} SNW deposited.` });
+    showToast(`${amount} SNW deposited successfully!`, "ok");
     setAmount("");
   } catch (e: any) {
     setStatus({ type: "err", msg: e.message?.slice(0, 120) ?? "Error" });
@@ -220,6 +231,7 @@ const tx = await c.withdraw(ethers.parseEther(amount));
     await refresh(address);
     saveTx({ type: "Withdraw", amount: `${amount} SNW + yield`, hash: receipt.hash, time: Date.now(), status: "Confirmed" });
     setStatus({ type: "ok", msg: `${amount} SNW + yield sent back to your wallet.` });
+    showToast(`${amount} SNW + yield withdrawn!`, "ok");
   } catch (e: any) {
     setStatus({ type: "err", msg: e.message?.slice(0, 120) ?? "Something went wrong." });
   }
@@ -764,6 +776,22 @@ function HeroCanvas() {
         .social-btn:hover{background:var(--surface3);color:var(--white);}
         .foot-tags{display:flex;align-items:center;gap:6px;}
         .foot-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);background:var(--surface2);padding:4px 10px;border-radius:20px;}
+        .toast{position:fixed;bottom:32px;right:32px;z-index:999;padding:14px 20px;border-radius:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;animation:slideUp .3s ease;max-width:320px;}
+.toast.ok{background:#1a3a2a;border:1px solid var(--green);color:var(--green);}
+.toast.err{background:#3a1a1a;border:1px solid var(--red);color:var(--red);}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.hamburger{display:none;flex-direction:column;gap:4px;cursor:pointer;padding:8px;}
+.hamburger span{width:20px;height:2px;background:var(--white);border-radius:2px;}
+.mobile-menu{display:none;position:fixed;top:56px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--line);padding:12px 0;z-index:299;}
+.mobile-menu.open{display:flex;flex-direction:column;}
+.mobile-link{padding:12px 24px;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;border:none;background:none;text-align:left;width:100%;}
+.mobile-link:hover{color:var(--white);}
+.theme-toggle{background:var(--surface2);border:none;color:var(--muted);padding:6px 10px;border-radius:20px;cursor:pointer;font-size:12px;}
+.auto-compound{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--line);}
+.toggle{width:36px;height:20px;border-radius:10px;background:var(--surface3);border:none;cursor:pointer;position:relative;transition:background .2s;}
+.toggle.on{background:var(--accent);}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--white);transition:transform .2s;}
+.toggle.on::after{transform:translateX(16px);}
 
         @media(max-width:900px){
           .hero-content{padding:60px 24px 48px;}
@@ -783,6 +811,7 @@ function HeroCanvas() {
           .tools-nav{border-right:none;}
           .hist-cards{grid-template-columns:1fr 1fr;}
           .bal-stats{grid-template-columns:1fr 1fr;}
+          .hamburger{display:flex;}
         }
       `}</style>
 
@@ -802,8 +831,12 @@ function HeroCanvas() {
             ))}
           </div>
         </div>
+        <div className="hamburger" onClick={() => setMobileMenu(!mobileMenu)}>
+  <span/><span/><span/>
+</div>
         <div className="nav-right">
           <div className="chain-badge"><span className="live-dot" />Snow Chain</div>
+          <button className="theme-toggle" onClick={() => setDarkMode(!darkMode)}>{darkMode ? "☀️" : "🌙"}</button>
           {address ? (
             <>
               <div className="addr-badge" onClick={() => setSection("vault")}>{shortAddr}</div>
@@ -814,7 +847,11 @@ function HeroCanvas() {
           )}
         </div>
       </nav>
-
+      <div className={`mobile-menu${mobileMenu ? " open" : ""}`}>
+  {navItems.map(n => (
+    <button key={n.id} className="mobile-link" onClick={() => { setSection(n.id); setMobileMenu(false); }}>{n.label}</button>
+  ))}
+</div>
       <div className="page">
 
         {/* HOME */}
@@ -843,7 +880,7 @@ function HeroCanvas() {
       <div className="metric"><div className="metric-n">5%</div><div className="metric-l">Annual yield</div></div>
       <div className="metric"><div className="metric-n">100ms</div><div className="metric-l">Block time</div></div>
       <div className="metric"><div className="metric-n">0 days</div><div className="metric-l">Lock-up period</div></div>
-      <div className="metric"><div className="metric-n">SNW</div><div className="metric-l">Native token</div></div>
+      <div className="metric"><div className="metric-n">{tvl}</div><div className="metric-l">Total SNW locked</div></div>
     </div>
     <HeroCanvas />
   </div>
@@ -1018,7 +1055,14 @@ function HeroCanvas() {
                     <input type="number" className="f-input" placeholder="0.0" value={amount} onChange={e => setAmount(e.target.value)} />
                     <button className="btn-dep" onClick={deposit} disabled={loading || !amount}>{loading ? "Confirming..." : "Deposit into Vault"}</button>
                     <div style={{ height: 12 }} />
-                    <label className="f-label">Withdraw</label>
+<div className="auto-compound">
+  <div>
+    <div className="f-label" style={{ marginBottom: 2 }}>Auto-compound</div>
+    <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "IBM Plex Mono" }}>Reinvest yield automatically</span>
+  </div>
+  <button className={`toggle${autoCompound ? " on" : ""}`} onClick={() => setAutoCompound(!autoCompound)} />
+</div>
+<label className="f-label">Withdraw</label>
                     <span className="f-hint">In vault: {balance} SNW + {yieldEarned} yield</span>
                     <button className="btn-wth" onClick={withdraw} disabled={loading || !amount}>{loading ? "Confirming..." : "Withdraw and Collect Yield"}</button>
                     {status && <div className={`status-bar ${status.type}`}>{status.msg}</div>}
@@ -1278,6 +1322,7 @@ function HeroCanvas() {
             </div>
           </div>
         )}
+        {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
 
         <footer>
           <div className="foot-l">
