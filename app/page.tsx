@@ -3,7 +3,7 @@ import { useInterwovenKit } from "@initia/interwovenkit-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ethers } from "ethers";
 
-const CONTRACT = "0x2b1092F40891Faf26354e589Ab3E0c7dd15ea341";
+const CONTRACT = "0x80fc3f9E5Aa513cB3DAfa721D8236A0e791dc3aF";
 const CHAIN_ID_HEX = "0x8df38dd443ebb";
 const RPC = "https://fortress-node-production.up.railway.app";
 const GAS_STATION = "0xBd33C81E9c15f9554140bF49bDF3db6269E094f5";
