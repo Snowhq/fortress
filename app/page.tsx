@@ -471,15 +471,27 @@ function HeroCanvas() {
           --red2:rgba(248,113,113,0.08);
           --blue:#60a5fa;
           body.light{
-  --bg:#f8f8f8;
+  --bg:#f5f5f5;
   --surface:#ffffff;
-  --surface2:#f0f0f0;
+  --surface2:#ebebeb;
   --surface3:#e0e0e0;
-  --white:#08080a;
-  --muted:#666666;
+  --white:#111111;
+  --muted:#555555;
   --muted2:#999999;
   --line:rgba(0,0,0,0.08);
+  --accent:#a07840;
+  --accent2:rgba(160,120,64,0.1);
+  --green:#16a34a;
+  --green2:rgba(22,163,74,0.08);
+  --red:#dc2626;
+  --red2:rgba(220,38,38,0.08);
 }
+body.light .hero-h1{color:#111111 !important;}
+body.light .hero-h1 .ghost{-webkit-text-stroke:1px rgba(0,0,0,0.3);color:transparent;}
+body.light .hero-p{color:#555555;}
+body.light .hero-tag{color:var(--accent);}
+body.light canvas{filter:invert(1) hue-rotate(180deg);}
+body.light .logo-f{background:#111111;color:#ffffff;}
         }
 
         html,body{background:var(--bg);color:var(--white);font-family:'Space Grotesk',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
