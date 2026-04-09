@@ -20,6 +20,8 @@ export default function Fortress() {
   const [balance, setBalance] = useState("0.0000");
   const [walletBalance, setWalletBalance] = useState("0.0000");
   const [yieldEarned, setYieldEarned] = useState("0.000000");
+  const [displayYield, setDisplayYield] = useState(0);
+  const yieldRef = useRef(0);
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<{ type: "ok" | "err" | "info"; msg: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,6 +46,7 @@ const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(n
 const [mobileMenu, setMobileMenu] = useState(false);
 const [darkMode, setDarkMode] = useState(true);
 const [autoCompound, setAutoCompound] = useState(false);
+const [blockNumber, setBlockNumber] = useState("...");
 
   useEffect(() => {
     const saved = localStorage.getItem("fortress_address");
@@ -91,6 +94,7 @@ async function refresh(addr: string) {
     const walNum = parseFloat(ethers.formatEther(walBal));
     setBalance(balNum.toFixed(4));
     setYieldEarned(yldNum.toFixed(6));
+yieldRef.current = yldNum;
     setWalletBalance(walNum.toFixed(4));
     const contractBal = await readProvider.getBalance(CONTRACT);
 setTvl(parseFloat(ethers.formatEther(contractBal)).toFixed(0));
@@ -145,6 +149,27 @@ setTvl(parseFloat(ethers.formatEther(contractBal)).toFixed(0));
   }
   fetchTvl();
   const interval = setInterval(fetchTvl, 10000);
+  return () => clearInterval(interval);
+}, []);
+useEffect(() => {
+  if (!address || parseFloat(balance) === 0) return;
+  const tick = setInterval(() => {
+    const perSecond = (parseFloat(balance) * 0.05) / (365 * 24 * 3600);
+    yieldRef.current += perSecond;
+    setDisplayYield(yieldRef.current);
+  }, 1000);
+  return () => clearInterval(tick);
+}, [address, balance]);
+useEffect(() => {
+  async function fetchBlock() {
+    try {
+      const provider = new ethers.JsonRpcProvider(RPC);
+      const block = await provider.getBlockNumber();
+      setBlockNumber(block.toLocaleString());
+    } catch {}
+  }
+  fetchBlock();
+  const interval = setInterval(fetchBlock, 2000);
   return () => clearInterval(interval);
 }, []);
 
@@ -869,7 +894,7 @@ body.light .logo-f{background:#111111;color:#ffffff;}
   <span/><span/><span/>
 </div>
         <div className="nav-right">
-          <div className="chain-badge"><span className="live-dot" />Snow Chain</div>
+          <div className="chain-badge"><span className="live-dot" />Snow Chain · #{blockNumber}</div>
           <button className="theme-toggle" onClick={() => {
   setDarkMode(!darkMode);
   document.body.classList.toggle("light");
@@ -1049,7 +1074,7 @@ body.light .logo-f{background:#111111;color:#ffffff;}
                       <div className="bal-num">{balance}<small>SNW</small></div>
                     </div>
                     <div className="bal-stats">
-                      <div className="bs-item"><div className="bs-l">Yield earned</div><div className="bs-v g">+{yieldEarned}</div></div>
+                      <div className="bs-item"><div className="bs-l">Yield earned</div><div className="bs-v g">+{displayYield > 0 ? displayYield.toFixed(6) : yieldEarned}</div></div>
                       <div className="bs-item"><div className="bs-l">APY</div><div className="bs-v">5.00%</div></div>
                       <div className="bs-item"><div className="bs-l">Wallet</div><div className="bs-v gold">{walletBalance} SNW</div></div>
                       <div className="bs-item"><div className="bs-l">Lock-up</div><div className="bs-v">None</div></div>
@@ -1090,7 +1115,10 @@ body.light .logo-f{background:#111111;color:#ffffff;}
                   <div className="action-card">
                     <label className="f-label">Deposit amount</label>
                     <span className="f-hint">Available: {walletBalance} SNW in wallet</span>
-                    <input type="number" className="f-input" placeholder="0.0" value={amount} onChange={e => setAmount(e.target.value)} />
+                    <div style={{ position: "relative" }}>
+  <input type="number" className="f-input" placeholder="0.0" value={amount} onChange={e => setAmount(e.target.value)} style={{ paddingRight: "52px" }} />
+  <button onClick={() => setAmount(walletBalance)} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "var(--accent2)", color: "var(--accent)", border: "none", borderRadius: "4px", padding: "3px 8px", fontSize: "10px", fontFamily: "IBM Plex Mono", cursor: "pointer", marginBottom: "12px" }}>MAX</button>
+</div>
                     <button className="btn-dep" onClick={deposit} disabled={loading || !amount}>{loading ? "Confirming..." : "Deposit into Vault"}</button>
                     <div style={{ height: 12 }} />
 <div className="auto-compound">
@@ -1101,7 +1129,10 @@ body.light .logo-f{background:#111111;color:#ffffff;}
   <button className={`toggle${autoCompound ? " on" : ""}`} onClick={() => setAutoCompound(!autoCompound)} />
 </div>
 <label className="f-label">Withdraw</label>
-                    <span className="f-hint">In vault: {balance} SNW + {yieldEarned} yield</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+  <span className="f-hint" style={{ marginBottom: 0 }}>In vault: {balance} SNW + {yieldEarned} yield</span>
+  <button onClick={() => setAmount(balance)} style={{ background: "var(--accent2)", color: "var(--accent)", border: "none", borderRadius: "4px", padding: "3px 8px", fontSize: "10px", fontFamily: "IBM Plex Mono", cursor: "pointer" }}>MAX</button>
+</div>
                     <button className="btn-wth" onClick={withdraw} disabled={loading || !amount}>{loading ? "Confirming..." : "Withdraw and Collect Yield"}</button>
                     {status && <div className={`status-bar ${status.type}`}>{status.msg}</div>}
                   </div>
