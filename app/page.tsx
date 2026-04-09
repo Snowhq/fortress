@@ -523,7 +523,22 @@ body.light .hero-h1{color:#111111;}
 body.light .hero-h1 .ghost{-webkit-text-stroke:1px rgba(0,0,0,0.2);color:transparent;}
 body.light .hero-p{color:#555555;}
 body.light .hero-tag{color:var(--accent);}
-body.light canvas{filter:invert(0.85) sepia(0.1);}
+body.light .bal-card{background:#ffffff;box-shadow:0 4px 24px rgba(0,0,0,0.08);}
+body.light .bal-num{color:#111111;}
+body.light .bal-stats{background:#f4f4f8;}
+body.light .bs-v{color:#111111;}
+body.light .vault-main{background:#f8f8fc;}
+body.light .vault-side{background:#ffffff;}
+body.light .action-card{background:#f4f4f8;}
+body.light .tx-item:nth-child(odd){background:#ffffff;}
+body.light .tx-item:nth-child(even){background:#f4f4f8;}
+body.light .tx-cell{color:#444444;}
+body.light .sec-label{color:#888888;}
+body.light .f-input{background:#ebebf0;color:#111111;}
+body.light .btn-dep{background:#111111;color:#ffffff;}
+body.light .btn-wth{background:#ebebf0;color:#111111;}
+body.light .metrics{border-top:1px solid rgba(0,0,0,0.08);}
+body.light .metric-n{color:#111111;}
 body.light .logo-f{background:#111111;color:#ffffff;}
 body.light nav{background:rgba(255,255,255,0.9);}
 body.light .chain-badge{background:#f0f0f0;color:#444;}
