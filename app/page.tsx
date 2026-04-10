@@ -46,6 +46,7 @@ const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(n
 const [mobileMenu, setMobileMenu] = useState(false);
 const [darkMode, setDarkMode] = useState(true);
 const [autoCompound, setAutoCompound] = useState(false);
+const [selectedTier, setSelectedTier] = useState(1);
 const [blockNumber, setBlockNumber] = useState("...");
 
   useEffect(() => {
@@ -80,8 +81,8 @@ async function refresh(addr: string) {
     const readProvider = new ethers.JsonRpcProvider(RPC);
     const walletProvider = new ethers.BrowserProvider((window as any).ethereum);
     const abi = [
-      "function balances(address) view returns (uint256)",
-      "function calculateYield(address) view returns (uint256)"
+      "function calculateYield(address) view returns (uint256)",
+"function getUserInfo(address) view returns (uint256,uint256,uint256,bool,bool)"
     ];
     const c = new ethers.Contract(CONTRACT, abi, readProvider);
     const [bal, yld, walBal] = await Promise.all([
@@ -212,15 +213,15 @@ function showToast(msg: string, type: "ok" | "err") {
     const provider = new ethers.BrowserProvider((window as any).ethereum);
     const signer = await provider.getSigner();
 
-    const c = new ethers.Contract(
-      CONTRACT,
-      ["function deposit() payable"],
-      signer
-    );
+  const c = new ethers.Contract(
+  CONTRACT,
+  ["function deposit(uint256 tier) payable"],
+  signer
+);
 
-    const tx = await c.deposit({
-      value: ethers.parseEther(amount)
-    });
+const tx = await c.deposit(selectedTier, {
+  value: ethers.parseEther(amount)
+});
 
     setStatus({ type: "info", msg: "Waiting for confirmation..." });
 
@@ -1031,7 +1032,7 @@ body.light .addr-badge{background:rgba(160,120,64,0.1);color:#a07840;}
                     <div className="route-arr">→</div>
                     <div className="route-box"><div className="route-name">Snow Chain</div><div className="route-sub mono">EVM appchain</div></div>
                   </div>
-                  <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.75 }}>Tokens move through the Interwoven Bridge. Once confirmed on L1, they appear on Snow Chain within seconds.</p>
+                  <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.75 }}>Tokens move through the Interwoven Bridge. Once confirmed on L1, they appear on your destination chain within seconds.</p>
                 </div>
                 <div className="card">
                   <div className="sec-label">Steps</div>
@@ -1136,6 +1137,26 @@ body.light .addr-badge{background:rgba(160,120,64,0.1);color:#a07840;}
                 <div>
                   <div className="sec-label">Actions</div>
                   <div className="action-card">
+                    <label className="f-label">Vault tier</label>
+<div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+  {[
+    { tier: 0, label: "3% APY", name: "Conservative" },
+    { tier: 1, label: "5% APY", name: "Standard" },
+    { tier: 2, label: "8% APY", name: "Aggressive" },
+  ].map(t => (
+    <button key={t.tier} onClick={() => setSelectedTier(t.tier)} style={{
+      flex: 1, padding: "8px 4px", borderRadius: 8, border: "none",
+      background: selectedTier === t.tier ? "var(--accent)" : "var(--surface2)",
+      color: selectedTier === t.tier ? "var(--bg)" : "var(--muted)",
+      fontSize: 11, fontFamily: "IBM Plex Mono", cursor: "pointer",
+      fontWeight: selectedTier === t.tier ? 700 : 400,
+      transition: "all .15s"
+    }}>
+      <div style={{ fontWeight: 700 }}>{t.label}</div>
+      <div style={{ fontSize: 10, opacity: 0.8 }}>{t.name}</div>
+    </button>
+  ))}
+</div>
                     <label className="f-label">Deposit amount</label>
                     <span className="f-hint">Available: {walletBalance} SNW in wallet</span>
                     <div style={{ position: "relative" }}>
