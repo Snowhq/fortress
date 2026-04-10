@@ -1020,7 +1020,7 @@ body.light .addr-badge{background:rgba(160,120,64,0.1);color:#a07840;}
             <div className="pg-head">
               <div className="pg-tag">Bridge</div>
               <div className="pg-title">Bring your tokens to Snow Chain</div>
-              <div className="pg-sub">The Interwoven Bridge is Initia's native cross-chain protocol. Fortress is built to work with it when deployed on a live network.</div>
+              <div className="pg-sub">Fortress is built on Snow Chain, an EVM appchain within the Initia ecosystem. This page shows how the Interwoven Bridge protocol works for cross-chain transfers in production.</div>
             </div>
             <div className="bridge-layout">
               <div>
