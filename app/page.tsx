@@ -85,12 +85,16 @@ async function refresh(addr: string) {
 "function getUserInfo(address) view returns (uint256,uint256,uint256,bool,bool)"
     ];
     const c = new ethers.Contract(CONTRACT, abi, readProvider);
-    const [bal, yld, walBal] = await Promise.all([
-      c.balances(addr),
-      c.calculateYield(addr),
-      readProvider.getBalance(addr)
-    ]);
-    const balNum = parseFloat(ethers.formatEther(bal));
+    const [userInfo, yld, walBal] = await Promise.all([
+  c.getUserInfo(addr),
+  c.calculateYield(addr),
+  readProvider.getBalance(addr)
+]);
+const balNum = parseFloat(ethers.formatEther(userInfo[0]));
+const userTier = Number(userInfo[1]);
+const userApy = Number(userInfo[2]);
+const hasStreak = userInfo[3];
+setSelectedTier(userTier);
     const yldNum = parseFloat(ethers.formatEther(yld));
     const walNum = parseFloat(ethers.formatEther(walBal));
     setBalance(balNum.toFixed(4));
@@ -107,7 +111,7 @@ setTvl(parseFloat(ethers.formatEther(contractBal)).toFixed(0));
     const provider = new ethers.BrowserProvider((window as any).ethereum);
 
     const abi = [
-      "function balances(address) view returns (uint256)",
+      "function getUserInfo(address) view returns (uint256,uint256,uint256,bool,bool)",
       "function calculateYield(address) view returns (uint256)",
       "event Deposited(address indexed user, uint256 amount)"
     ];
@@ -120,18 +124,17 @@ setTvl(parseFloat(ethers.formatEther(contractBal)).toFixed(0));
 
     const rows = await Promise.all(
       uniqueAddrs.map(async (addr: any) => {
-        const [bal, yld] = await Promise.all([
-          c.balances(addr),
-          c.calculateYield(addr)
-        ]);
-
-        return {
-          addr: `${addr.slice(0, 6)}...${addr.slice(-4)}`,
-          fullAddr: addr,
-          deposited: parseFloat(ethers.formatEther(bal)).toFixed(4),
-          earned: parseFloat(ethers.formatEther(yld)).toFixed(6),
-          bal: parseFloat(ethers.formatEther(bal))
-        };
+        const [info, yld] = await Promise.all([
+  c.getUserInfo(addr),
+  c.calculateYield(addr)
+]);
+return {
+  addr: `${addr.slice(0, 6)}...${addr.slice(-4)}`,
+  fullAddr: addr,
+  deposited: parseFloat(ethers.formatEther(info[0])).toFixed(4),
+  earned: parseFloat(ethers.formatEther(yld)).toFixed(6),
+  bal: parseFloat(ethers.formatEther(info[0]))
+};
       })
     );
 
@@ -1099,7 +1102,7 @@ body.light .addr-badge{background:rgba(160,120,64,0.1);color:#a07840;}
                     </div>
                     <div className="bal-stats">
                       <div className="bs-item"><div className="bs-l">Yield earned</div><div className="bs-v g">+{displayYield > 0 ? displayYield.toFixed(6) : yieldEarned}</div></div>
-                      <div className="bs-item"><div className="bs-l">APY</div><div className="bs-v">5.00%</div></div>
+                      <div className="bs-item"><div className="bs-l">APY</div><div className="bs-v">{selectedTier === 0 ? "3.00%" : selectedTier === 1 ? "5.00%" : "8.00%"}+</div></div>
                       <div className="bs-item"><div className="bs-l">Wallet</div><div className="bs-v gold">{walletBalance} SNW</div></div>
                       <div className="bs-item"><div className="bs-l">Lock-up</div><div className="bs-v">None</div></div>
                     </div>
